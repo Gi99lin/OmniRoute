@@ -162,48 +162,61 @@ export default function UsageAnalytics() {
         />
       </div>
 
-      {/* Secondary Metrics — compact grid */}
+      {/* Secondary Metrics — compact grid with sections */}
       <CompactStatGrid
-        stats={[
-          // Infrastructure
-          { icon: "group", label: "Accounts", value: s.uniqueAccounts || 0 },
-          { icon: "dns", label: "Providers", value: providerCount, color: "text-indigo-500" },
-          { icon: "vpn_key", label: "API Keys", value: s.uniqueApiKeys || 0 },
-          { icon: "model_training", label: "Models", value: s.uniqueModels || 0 },
-          // Performance
+        sections={[
           {
-            icon: "speed",
-            label: "Avg Tokens/Req",
-            value: fmt(avgTokensPerReq),
-            color: "text-cyan-500",
+            title: "Infrastructure",
+            items: [
+              { icon: "group", label: "Accounts", value: s.uniqueAccounts || 0 },
+              { icon: "dns", label: "Providers", value: providerCount, color: "text-indigo-500" },
+              { icon: "vpn_key", label: "API Keys", value: s.uniqueApiKeys || 0 },
+              { icon: "model_training", label: "Models", value: s.uniqueModels || 0 },
+            ],
           },
           {
-            icon: "request_quote",
-            label: "Cost/Req",
-            value: fmtCost(costPerReq),
-            color: "text-orange-500",
+            title: "Performance",
+            items: [
+              {
+                icon: "speed",
+                label: "Avg Tokens/Req",
+                value: fmt(avgTokensPerReq),
+                color: "text-cyan-500",
+              },
+              {
+                icon: "request_quote",
+                label: "Cost/Req",
+                value: fmtCost(costPerReq),
+                color: "text-orange-500",
+              },
+              {
+                icon: "compare_arrows",
+                label: "I/O Ratio",
+                value: `${ioRatio}x`,
+                color: "text-violet-500",
+              },
+              {
+                icon: "swap_horiz",
+                label: "Fallback Rate",
+                value: `${Number(s.fallbackRatePct || 0).toFixed(1)}%`,
+                color: "text-amber-500",
+              },
+            ],
           },
           {
-            icon: "compare_arrows",
-            label: "I/O Ratio",
-            value: `${ioRatio}x`,
-            color: "text-violet-500",
-          },
-          {
-            icon: "swap_horiz",
-            label: "Fallback Rate",
-            value: `${Number(s.fallbackRatePct || 0).toFixed(1)}%`,
-            color: "text-amber-500",
-          },
-          // Highlights
-          { icon: "star", label: "Top Model", value: topModel, color: "text-pink-500" },
-          { icon: "cloud", label: "Top Provider", value: topProvider, color: "text-teal-500" },
-          { icon: "today", label: "Busiest Day", value: busiestDay, color: "text-rose-500" },
-          {
-            icon: "network_node",
-            label: "Diversity Score",
-            value: `${providerDiversity.toFixed(1)}%`,
-            color: "text-sky-500",
+            title: "Highlights",
+            wideValues: true,
+            items: [
+              { icon: "star", label: "Top Model", value: topModel, color: "text-pink-500" },
+              { icon: "cloud", label: "Top Provider", value: topProvider, color: "text-teal-500" },
+              { icon: "today", label: "Busiest Day", value: busiestDay, color: "text-rose-500" },
+              {
+                icon: "network_node",
+                label: "Diversity",
+                value: `${providerDiversity.toFixed(1)}%`,
+                color: "text-sky-500",
+              },
+            ],
           },
         ]}
       />
