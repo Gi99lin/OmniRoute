@@ -100,13 +100,15 @@ export function StatCard({
   color?: string;
 }) {
   return (
-    <Card className="px-4 py-3 flex flex-col gap-1">
-      <div className="flex items-center gap-2 text-text-muted text-xs uppercase font-semibold tracking-wider">
-        <span className="material-symbols-outlined text-[16px]">{icon}</span>
-        {label}
+    <Card className="px-4 py-3 flex flex-col gap-1 min-w-0">
+      <div className="flex items-center gap-2 text-text-muted text-xs uppercase font-semibold tracking-wider whitespace-nowrap overflow-hidden text-ellipsis">
+        <span className="material-symbols-outlined text-[16px] shrink-0">{icon}</span>
+        <span className="truncate">{label}</span>
       </div>
-      <span className={`text-2xl font-bold ${color}`}>{value}</span>
-      {subValue && <span className="text-xs text-text-muted">{subValue}</span>}
+      <span className={`text-2xl font-bold ${color} truncate`} title={String(value)}>
+        {value}
+      </span>
+      {subValue && <span className="text-xs text-text-muted truncate">{subValue}</span>}
     </Card>
   );
 }

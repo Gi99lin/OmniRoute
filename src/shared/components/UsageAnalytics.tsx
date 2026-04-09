@@ -134,7 +134,7 @@ export default function UsageAnalytics() {
       </div>
 
       {/* Summary Cards — Row 1: Core metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-8 gap-3">
         <StatCard
           icon="generating_tokens"
           label="Total Tokens"
@@ -172,7 +172,7 @@ export default function UsageAnalytics() {
       </div>
 
       {/* Summary Cards — Row 2: Derived insights */}
-      <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-8 gap-3">
         <StatCard
           icon="speed"
           label="Avg Tokens/Req"
