@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+---
+
+## [3.5.6] — 2026-04-09
+
 ### ✨ New Features
 
 - **Chinese Localization (zh-CN):** Added missing translations for Context Relay, Memory, LKGP, and Models.dev sync features, while standardizing terminology across the application (#1079).
