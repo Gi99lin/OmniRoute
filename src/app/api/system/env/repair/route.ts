@@ -6,7 +6,7 @@
  * Safety: Only fills missing OAuth defaults from .env.example.
  */
 import { copyFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { NextResponse } from "next/server";
 import { isAuthenticated } from "@/shared/utils/apiAuth";
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      backupPath,
+      backupPath: backupPath ? basename(backupPath) : null,
       created: result.created,
       added: result.added,
       missingCount: plan.missingEntries.length,
