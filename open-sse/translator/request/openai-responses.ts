@@ -124,7 +124,8 @@ export function openaiResponsesToOpenAIRequest(
               if (contentItem.detail !== undefined) {
                 (imgResult.image_url as JsonRecord).detail = contentItem.detail;
               }
-              return imgResult;
+
+return imgResult;
             }
             if (contentItem.type === "input_file") {
               const fileObj: JsonRecord = {};
@@ -264,7 +265,8 @@ export function openaiResponsesToOpenAIRequest(
     } else if (tcType && tcType !== "function" && tcType !== "allowed_tools") {
       // Built-in tool types (web_search_preview, file_search, etc.) have no Chat equivalent
       throw unsupportedFeature(
-        `Unsupported Responses API feature: tool_choice type '${tcType}' is not supported by omniroute`
+
+`Unsupported Responses API feature: tool_choice type '${tcType}' is not supported by omniroute`
       );
     }
   }
@@ -386,7 +388,8 @@ export function openaiToOpenAIResponsesRequest(
           const contentItem = toRecord(contentValue);
           if (contentItem.type === "text") {
             outputContent.push({ type: "output_text", text: toString(contentItem.text) });
-          } else if (contentItem.type === "thinking" || contentItem.type === "redacted_thinking") {
+
+} else if (contentItem.type === "thinking" || contentItem.type === "redacted_thinking") {
             // Reasoning already moved above
             continue;
           } else {
@@ -525,7 +528,8 @@ export function openaiToOpenAIResponsesRequest(
 
   // Pass through relevant fields
   if (root.previous_response_id !== undefined) {
-    result.previous_response_id = root.previous_response_id;
+
+result.previous_response_id = root.previous_response_id;
   }
   if (root.prompt_cache_key !== undefined) {
     result.prompt_cache_key = root.prompt_cache_key;
@@ -538,7 +542,14 @@ export function openaiToOpenAIResponsesRequest(
   }
   if (root.service_tier !== undefined) result.service_tier = root.service_tier;
   if (root.temperature !== undefined) result.temperature = root.temperature;
-  if (root.max_tokens !== undefined) result.max_tokens = root.max_tokens;
+  // Translate max_tokens / max_completion_tokens → max_output_tokens for Responses API.
+  // The Responses API does not accept max_tokens or max_completion_tokens; it requires
+  // max_output_tokens. max_completion_tokens takes priority as the newer Chat Completions field.
+  if (root.max_completion_tokens !== undefined) {
+    result.max_output_tokens = root.max_completion_tokens;
+  } else if (root.max_tokens !== undefined) {
+    result.max_output_tokens = root.max_tokens;
+  }
   if (root.top_p !== undefined) result.top_p = root.top_p;
   if (storeEnabled) {
     if (root[RESPONSES_STORE_MARKER] !== undefined) {
