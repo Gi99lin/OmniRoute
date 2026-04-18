@@ -438,20 +438,30 @@ export class CodexExecutor extends BaseExecutor {
 
     // If no instructions provided, inject default Codex instructions
     // NOTE: must run before the passthrough return — Codex upstream rejects
-    // requests without instructions even when the body is forwarded as-is.
-    if (!body.instructions || body.instructions.trim() === "") {
+    // requests without instructions even when the body is forwarded as-is, UNLESS
+    // it's a native passthrough that provides its own system instructions in input.
+    if (!nativeCodexPassthrough && (!body.instructions || body.instructions.trim() === "")) {
       body.instructions = CODEX_DEFAULT_INSTRUCTIONS;
     }
 
+    // Default store to true to enable automatic prompt caching and
+    // previous_response_id chaining. Only override if explicitly configured.
     if (!storeEnabled) {
-      body.store = false;
+      // Allow store: true by default for prompt caching benefits.
+      // Client can still explicitly set store: false if desired.
+      if (body.store === undefined) {
+        body.store = true;
+      }
     } else if (responsesStoreMarker !== undefined && body.store === undefined) {
       body.store = responsesStoreMarker;
     }
 
     // Cursor can send native Responses payloads with role=system items inside `input`.
     // Codex rejects system messages there; they must be folded into `instructions`.
-    hoistSystemMessagesToInstructions(body);
+    // However, OpenClaw requires role=system for prompt caching.
+    if (!nativeCodexPassthrough) {
+      hoistSystemMessagesToInstructions(body);
+    }
 
     // Codex Responses only supports function tools with non-empty names.
     // Cursor may include custom tools (e.g. ApplyPatch) that work locally but are
@@ -496,6 +506,11 @@ export class CodexExecutor extends BaseExecutor {
     }
     delete body.reasoning_effort;
 
+    // Token limits are strictly unsupported by the Codex Responses endpoint
+    // and will cause 400 errors even in native passthrough mode.
+    delete body.max_tokens;
+    delete body.max_output_tokens;
+
     if (nativeCodexPassthrough) {
       return body;
     }
@@ -509,8 +524,6 @@ export class CodexExecutor extends BaseExecutor {
     delete body.top_logprobs;
     delete body.n;
     delete body.seed;
-    delete body.max_tokens;
-    delete body.max_output_tokens; // Responses API translator maps max_tokens -> max_output_tokens, but Codex rejects it
     delete body.user; // Cursor sends this but Codex doesn't support it
     delete body.prompt_cache_retention; // Cursor sends this but Codex doesn't support it
     delete body.metadata; // Cursor sends this but Codex doesn't support it
