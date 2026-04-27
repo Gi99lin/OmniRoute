@@ -489,7 +489,7 @@ function consumeResponsesStoreMarker(body: Record<string, unknown>): unknown {
   return marker;
 }
 
-export function isCodexResponsesWebSocketRequired(model: string, credentials: unknown): boolean {
+export function isCodexResponsesWebSocketRequired(_model: string, credentials: unknown): boolean {
   // OmniRoute is an HTTP→SSE gateway — WebSocket transport is unnecessary and
   // breaks when upstream requests go through an HTTP proxy (403 on WS upgrade).
   // Default to the standard HTTP Responses SSE endpoint for all Codex models.
@@ -498,10 +498,7 @@ export function isCodexResponsesWebSocketRequired(model: string, credentials: un
     credentials && typeof credentials === "object"
       ? (credentials as { providerSpecificData?: Record<string, unknown> }).providerSpecificData
       : null;
-  if (providerSpecificData?.codexTransport === "websocket" && getWreqWebsocket()) {
-    return true;
-  }
-  return false;
+  return !!(providerSpecificData?.codexTransport === "websocket" && getWreqWebsocket());
 }
 
 function toStatusCode(value: unknown): number | null {
