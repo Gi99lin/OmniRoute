@@ -31,7 +31,7 @@ type WebsocketFn = (url: string, opts?: Record<string, unknown>) => Promise<Wreq
 let _websocketFn: WebsocketFn | null = null;
 let _wreqChecked = false;
 
-function getWreqWebsocket(): WebsocketFn | null {
+function getCodexWebSocketTransport(): WebsocketFn | null {
   if (_wreqChecked) return _websocketFn;
   _wreqChecked = true;
   try {
@@ -490,6 +490,9 @@ function consumeResponsesStoreMarker(body: Record<string, unknown>): unknown {
 }
 
 export function isCodexResponsesWebSocketRequired(model: string, credentials: unknown): boolean {
+  // If wreq-js native module is unavailable (e.g. Docker/Alpine), fall back to HTTP transport.
+  // This allows gpt-5.5 to work via standard Responses SSE endpoint.
+  if (!getCodexWebSocketTransport()) return false;
   const normalizedModel = getCodexUpstreamModel(model).trim().toLowerCase();
   if (normalizedModel === "gpt-5.5") return true;
   const providerSpecificData =
@@ -638,12 +641,18 @@ export class CodexExecutor extends BaseExecutor {
     const headers = normalizeCodexWsHeaders(this.buildHeaders(input.credentials, true));
     mergeUpstreamExtraHeaders(headers, input.upstreamExtraHeaders);
 
-    const websocket = getCodexWebSocketTransport();
-    if (!websocket) {
+    const websocketFn = getCodexWebSocketTransport();
+    if (!websocketFn) {
       return {
-        response: errorResponse(
-          503,
-          "Codex WebSocket transport unavailable: wreq-js native module is missing for this platform"
+        response: new Response(
+          JSON.stringify({
+            error: {
+              code: "wreq_unavailable",
+              message:
+                "Codex WebSocket transport unavailable: wreq-js native module is missing for this platform.",
+            },
+          }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
         ),
         url,
         headers,
@@ -665,27 +674,6 @@ export class CodexExecutor extends BaseExecutor {
       type: "response.create",
       ...transformedBody,
     });
-
-    const websocketFn = getWreqWebsocket();
-    if (!websocketFn) {
-      return {
-        response: new Response(
-          JSON.stringify({
-            error: {
-              code: "wreq_unavailable",
-              message:
-                "wreq-js native module not available on this platform. " +
-                "The Codex WebSocket transport requires wreq-js with native binaries. " +
-                "Please reinstall with npm (not pnpm) or use HTTP transport instead.",
-            },
-          }),
-          { status: 503, headers: { "Content-Type": "application/json" } }
-        ),
-        url,
-        headers,
-        transformedBody,
-      };
-    }
 
     const encoder = new TextEncoder();
     let closed = false;
