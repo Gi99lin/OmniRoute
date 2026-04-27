@@ -490,16 +490,17 @@ function consumeResponsesStoreMarker(body: Record<string, unknown>): unknown {
 }
 
 export function isCodexResponsesWebSocketRequired(model: string, credentials: unknown): boolean {
-  // If wreq-js native module is unavailable (e.g. Docker/Alpine), fall back to HTTP transport.
-  // This allows gpt-5.5 to work via standard Responses SSE endpoint.
-  if (!getCodexWebSocketTransport()) return false;
-  const normalizedModel = getCodexUpstreamModel(model).trim().toLowerCase();
-  if (normalizedModel === "gpt-5.5") return true;
+  // OmniRoute acts as an HTTP→SSE gateway, so WebSocket transport is unnecessary
+  // and breaks when requests go through HTTP proxies (403 on WS upgrade).
+  // Always prefer HTTP Responses SSE unless the user explicitly opts in.
   const providerSpecificData =
     credentials && typeof credentials === "object"
       ? (credentials as { providerSpecificData?: Record<string, unknown> }).providerSpecificData
       : null;
-  return providerSpecificData?.codexTransport === "websocket";
+  if (providerSpecificData?.codexTransport === "websocket" && getCodexWebSocketTransport()) {
+    return true;
+  }
+  return false;
 }
 
 function toStatusCode(value: unknown): number | null {
