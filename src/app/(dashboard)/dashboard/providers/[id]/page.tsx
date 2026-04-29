@@ -5524,7 +5524,7 @@ const CONFIGURABLE_BASE_URL_PROVIDERS = new Set([
 const DEFAULT_PROVIDER_BASE_URLS: Record<string, string> = {
   "azure-openai": "https://example-resource.openai.azure.com",
   "bailian-coding-plan": "https://coding-intl.dashscope.aliyuncs.com/apps/anthropic/v1",
-  "xiaomi-mimo": "https://token-plan-ams.xiaomimimo.com/v1",
+  "xiaomi-mimo": "https://token-plan-sgp.xiaomimimo.com/v1",
   "searxng-search": "http://localhost:8888/search",
   petals: "https://chat.petals.dev/api/v1/generate",
 };
