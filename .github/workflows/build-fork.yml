@@ -35,7 +35,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/inkorcloud/omniroute:fix-claude-thinking-mapping
-            ghcr.io/inkorcloud/omniroute:latest
+            ghcr.io/gi99lin/omniroute:fix-xiaomi-mimo-provider
+            ghcr.io/gi99lin/omniroute:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
