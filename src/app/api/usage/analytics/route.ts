@@ -36,11 +36,22 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const range = searchParams.get("range") || "30d";
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
+    const apiKeyIdsParam = searchParams.get("apiKeyIds") || "";
+    const apiKeyIds = apiKeyIdsParam ? apiKeyIdsParam.split(",").filter(Boolean) : [];
 
     // Cap history load to last 365 days — the heatmap never looks beyond that,
     // and all named ranges (1d/7d/30d/90d/ytd) fall within this window.
+    // For custom ranges, extend the window if startDate is earlier.
     const heatmapSince = new Date();
     heatmapSince.setDate(heatmapSince.getDate() - 365);
+    if (startDate) {
+      const customStart = new Date(startDate);
+      if (customStart.getTime() < heatmapSince.getTime()) {
+        heatmapSince.setTime(customStart.getTime());
+      }
+    }
     const db = await getUsageDb(heatmapSince.toISOString());
     const history = db.data.history || [];
 
@@ -68,13 +79,29 @@ export async function GET(request) {
       /* ignore */
     }
 
-    const analytics: any = await computeAnalytics(history, range, connectionMap);
+    // Pre-filter by selected API keys (empty = all keys)
+    const filtered =
+      apiKeyIds.length > 0
+        ? history.filter((e: any) => e.apiKeyId && apiKeyIds.includes(e.apiKeyId))
+        : history;
+
+    const analytics: any = await computeAnalytics(filtered, range, connectionMap, {
+      startDate,
+      endDate,
+    });
 
     // T01: fallback transparency metrics from call_logs (requested_model vs routed model).
     try {
       const db = getDbInstance();
-      const sinceIso = getRangeStartIso(range);
-      const whereClause = sinceIso ? "WHERE timestamp >= @since" : "";
+      const sinceIso = startDate || getRangeStartIso(range);
+      const untilIso = endDate || null;
+      const whereClause =
+        sinceIso || untilIso
+          ? `WHERE ${[sinceIso ? "timestamp >= @since" : "", untilIso ? "timestamp <= @until" : ""].filter(Boolean).join(" AND ")}`
+          : "";
+      const queryParams: Record<string, string> = {};
+      if (sinceIso) queryParams.since = sinceIso;
+      if (untilIso) queryParams.until = untilIso;
       const row = db
         .prepare(
           `
@@ -92,7 +119,7 @@ export async function GET(request) {
           ${whereClause}
         `
         )
-        .get(sinceIso ? { since: sinceIso } : {}) as
+        .get(Object.keys(queryParams).length > 0 ? queryParams : {}) as
         | { total?: number; with_requested?: number; fallbacks?: number }
         | undefined;
 
