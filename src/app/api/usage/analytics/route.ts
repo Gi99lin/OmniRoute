@@ -79,11 +79,63 @@ export async function GET(request) {
       /* ignore */
     }
 
+    // ── Enrich entries with missing apiKeyName ──────────────────────────
+    // Some OmniRoute code paths don't pass apiKeyInfo when recording usage,
+    // leaving api_key_name NULL.  We backfill it using connectionId correlation:
+    // 1) Build connectionId → dominant apiKeyName from entries that have both.
+    // 2) For connections with no usage-level key data, check the API keys config.
+    // 3) Patch NULL entries in-place so downstream filtering & grouping is complete.
+    if (history.some((e: any) => e.connectionId && !e.apiKeyName)) {
+      // Step 1: dominant key per connectionId from existing usage data
+      const connKeyVotes: Record<string, Record<string, number>> = {};
+      for (const e of history as any[]) {
+        if (e.connectionId && e.apiKeyName) {
+          const m = (connKeyVotes[e.connectionId] ??= {});
+          m[e.apiKeyName] = (m[e.apiKeyName] || 0) + 1;
+        }
+      }
+      const connToKey: Record<string, string> = {};
+      for (const [cid, votes] of Object.entries(connKeyVotes)) {
+        let best = "";
+        let bestCnt = 0;
+        for (const [name, cnt] of Object.entries(votes)) {
+          if (cnt > bestCnt) { best = name; bestCnt = cnt; }
+        }
+        if (best) connToKey[cid] = best;
+      }
+
+      // Step 2: for connections still unresolved, look at API key allowedConnections
+      const orphanConnIds = new Set<string>();
+      for (const e of history as any[]) {
+        if (e.connectionId && !e.apiKeyName && !connToKey[e.connectionId]) {
+          orphanConnIds.add(e.connectionId);
+        }
+      }
+      if (orphanConnIds.size > 0) {
+        try {
+          const { getApiKeys } = await import("@/lib/localDb");
+          const apiKeys = (await getApiKeys()) as any[];
+          for (const ak of apiKeys) {
+            const allowed = Array.isArray(ak.allowedConnections) ? ak.allowedConnections : [];
+            const keyName = ak.name || ak.id;
+            for (const cid of allowed) {
+              if (typeof cid === "string" && orphanConnIds.has(cid) && !connToKey[cid]) {
+                connToKey[cid] = keyName;
+              }
+            }
+          }
+        } catch { /* ignore — apiKeys table may not exist */ }
+      }
+
+      // Step 3: patch NULL entries
+      for (const e of history as any[]) {
+        if (e.connectionId && !e.apiKeyName && connToKey[e.connectionId]) {
+          e.apiKeyName = connToKey[e.connectionId];
+        }
+      }
+    }
+
     // Pre-filter by selected API keys (empty = all keys).
-    // apiKeyName is the stable identifier — it is always set for any OmniRoute
-    // API key regardless of provider.  apiKeyId may be null for some providers
-    // (MiniMax, Xiaomi, etc.), so we match primarily on apiKeyName and fall
-    // back to apiKeyId for entries where apiKeyName is missing.
     const filtered =
       apiKeyIds.length > 0
         ? history.filter(
