@@ -60,14 +60,22 @@ export default function UsageAnalytics() {
       setAnalytics(data);
       setError(null);
 
-      // Update available keys from unfiltered data (only when no filter is active)
+      // Update available keys from unfiltered data (only when no filter is active).
+      // Use apiKeyId when available, fall back to apiKeyName for providers that
+      // don't set apiKeyId (e.g. MiniMax, Xiaomi).
       if (selectedApiKeys.length === 0 && data.byApiKey?.length > 0) {
-        setAvailableApiKeys(
-          data.byApiKey.map((k: any) => ({
-            id: k.apiKeyId || k.apiKeyName || "unknown",
+        const seen = new Set<string>();
+        const keys: { id: string; name: string }[] = [];
+        for (const k of data.byApiKey) {
+          const id = k.apiKeyId || k.apiKeyName || "unknown";
+          if (seen.has(id)) continue;
+          seen.add(id);
+          keys.push({
+            id,
             name: k.apiKeyName || k.apiKeyId || "unknown",
-          }))
-        );
+          });
+        }
+        setAvailableApiKeys(keys);
       }
     } catch (err) {
       setError((err as any).message);

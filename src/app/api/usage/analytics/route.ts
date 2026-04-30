@@ -79,10 +79,16 @@ export async function GET(request) {
       /* ignore */
     }
 
-    // Pre-filter by selected API keys (empty = all keys)
+    // Pre-filter by selected API keys (empty = all keys).
+    // Match on both apiKeyId and apiKeyName because some providers
+    // (e.g. MiniMax, Xiaomi) only set apiKeyName without apiKeyId.
     const filtered =
       apiKeyIds.length > 0
-        ? history.filter((e: any) => e.apiKeyId && apiKeyIds.includes(e.apiKeyId))
+        ? history.filter(
+            (e: any) =>
+              (e.apiKeyId && apiKeyIds.includes(e.apiKeyId)) ||
+              (e.apiKeyName && apiKeyIds.includes(e.apiKeyName))
+          )
         : history;
 
     const analytics: any = await computeAnalytics(filtered, range, connectionMap, {
