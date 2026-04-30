@@ -25,6 +25,7 @@ test("xiaomi-mimo registry uses the current default base URL and MiMo V2.5 + V2 
       "mimo-v2-pro",
       "mimo-v2-omni",
       "mimo-v2-tts",
+      "mimo-v2-flash",
     ]
   );
 });
