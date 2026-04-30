@@ -80,14 +80,16 @@ export async function GET(request) {
     }
 
     // Pre-filter by selected API keys (empty = all keys).
-    // Match on both apiKeyId and apiKeyName because some providers
-    // (e.g. MiniMax, Xiaomi) only set apiKeyName without apiKeyId.
+    // apiKeyName is the stable identifier — it is always set for any OmniRoute
+    // API key regardless of provider.  apiKeyId may be null for some providers
+    // (MiniMax, Xiaomi, etc.), so we match primarily on apiKeyName and fall
+    // back to apiKeyId for entries where apiKeyName is missing.
     const filtered =
       apiKeyIds.length > 0
         ? history.filter(
             (e: any) =>
-              (e.apiKeyId && apiKeyIds.includes(e.apiKeyId)) ||
-              (e.apiKeyName && apiKeyIds.includes(e.apiKeyName))
+              (e.apiKeyName && apiKeyIds.includes(e.apiKeyName)) ||
+              (e.apiKeyId && apiKeyIds.includes(e.apiKeyId))
           )
         : history;
 
