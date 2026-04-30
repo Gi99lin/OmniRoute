@@ -88,20 +88,24 @@ export async function GET(request) {
     if (history.some((e: any) => e.connectionId && !e.apiKeyName)) {
       // Step 1: dominant key per connectionId from existing usage data
       const connKeyVotes: Record<string, Record<string, number>> = {};
+      const connKeyIdMap: Record<string, Record<string, string>> = {}; // keyName → apiKeyId
       for (const e of history as any[]) {
         if (e.connectionId && e.apiKeyName) {
           const m = (connKeyVotes[e.connectionId] ??= {});
           m[e.apiKeyName] = (m[e.apiKeyName] || 0) + 1;
+          if (e.apiKeyId) {
+            (connKeyIdMap[e.connectionId] ??= {})[e.apiKeyName] = e.apiKeyId;
+          }
         }
       }
-      const connToKey: Record<string, string> = {};
+      const connToKey: Record<string, { name: string; id: string | null }> = {};
       for (const [cid, votes] of Object.entries(connKeyVotes)) {
         let best = "";
         let bestCnt = 0;
         for (const [name, cnt] of Object.entries(votes)) {
           if (cnt > bestCnt) { best = name; bestCnt = cnt; }
         }
-        if (best) connToKey[cid] = best;
+        if (best) connToKey[cid] = { name: best, id: connKeyIdMap[cid]?.[best] || null };
       }
 
       // Step 2: for connections still unresolved, look at API key allowedConnections
@@ -118,19 +122,22 @@ export async function GET(request) {
           for (const ak of apiKeys) {
             const allowed = Array.isArray(ak.allowedConnections) ? ak.allowedConnections : [];
             const keyName = ak.name || ak.id;
+            const keyId = ak.id || null;
             for (const cid of allowed) {
               if (typeof cid === "string" && orphanConnIds.has(cid) && !connToKey[cid]) {
-                connToKey[cid] = keyName;
+                connToKey[cid] = { name: keyName, id: keyId };
               }
             }
           }
         } catch { /* ignore — apiKeys table may not exist */ }
       }
 
-      // Step 3: patch NULL entries
+      // Step 3: patch NULL entries (both apiKeyName and apiKeyId)
       for (const e of history as any[]) {
         if (e.connectionId && !e.apiKeyName && connToKey[e.connectionId]) {
-          e.apiKeyName = connToKey[e.connectionId];
+          const resolved = connToKey[e.connectionId];
+          e.apiKeyName = resolved.name;
+          if (!e.apiKeyId && resolved.id) e.apiKeyId = resolved.id;
         }
       }
     }
