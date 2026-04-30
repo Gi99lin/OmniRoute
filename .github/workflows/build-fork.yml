@@ -35,7 +35,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/inkorcloud/omniroute:analytics-custom-range
-            ghcr.io/inkorcloud/omniroute:latest
+            ghcr.io/gi99lin/omniroute:analytics-custom-range
+            ghcr.io/gi99lin/omniroute:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
