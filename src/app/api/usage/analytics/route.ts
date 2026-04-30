@@ -119,6 +119,8 @@ export async function GET(request) {
         try {
           const { getApiKeys } = await import("@/lib/localDb");
           const apiKeys = (await getApiKeys()) as any[];
+
+          // 2a: match orphans via explicit allowedConnections lists
           for (const ak of apiKeys) {
             const allowed = Array.isArray(ak.allowedConnections) ? ak.allowedConnections : [];
             const keyName = ak.name || ak.id;
@@ -126,6 +128,35 @@ export async function GET(request) {
             for (const cid of allowed) {
               if (typeof cid === "string" && orphanConnIds.has(cid) && !connToKey[cid]) {
                 connToKey[cid] = { name: keyName, id: keyId };
+                orphanConnIds.delete(cid);
+              }
+            }
+          }
+
+          // 2b: for STILL unresolved orphans, attribute to the most-active
+          //     unrestricted key (allowedConnections is null/empty → can use any connection).
+          //     Note: parseAllowedConnections() normalizes null → [], so we check .length === 0.
+          if (orphanConnIds.size > 0) {
+            const unrestrictedKeys = apiKeys.filter(
+              (ak: any) =>
+                !Array.isArray(ak.allowedConnections) || ak.allowedConnections.length === 0
+            );
+            if (unrestrictedKeys.length > 0) {
+              // Pick the unrestricted key with the most usage in this dataset
+              let bestKey: any = unrestrictedKeys[0];
+              let bestCount = 0;
+              for (const uk of unrestrictedKeys) {
+                const ukName = uk.name || uk.id;
+                let count = 0;
+                for (const e of history as any[]) {
+                  if (e.apiKeyName === ukName) count++;
+                }
+                if (count > bestCount) { bestCount = count; bestKey = uk; }
+              }
+              const fallbackName = bestKey.name || bestKey.id;
+              const fallbackId = bestKey.id || null;
+              for (const cid of orphanConnIds) {
+                connToKey[cid] = { name: fallbackName, id: fallbackId };
               }
             }
           }
