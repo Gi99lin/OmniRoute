@@ -222,7 +222,21 @@ export default function UsageAnalytics() {
               }`}
             >
               <span className="material-symbols-outlined text-[13px]">date_range</span>
-              Custom
+              {customRangeLabel || "Custom"}
+              {range === "custom" && customRangeLabel && (
+                <span
+                  role="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRange("30d");
+                    setCustomStart("");
+                    setCustomEnd("");
+                  }}
+                  className="ml-0.5 opacity-70 hover:opacity-100"
+                >
+                  <span className="material-symbols-outlined text-[11px]">close</span>
+                </span>
+              )}
             </button>
 
             {/* Custom Range Picker Popover */}
@@ -237,44 +251,6 @@ export default function UsageAnalytics() {
           </div>
         </div>
       </div>
-
-      {/* Active custom range indicator */}
-      {customRangeLabel && (
-        <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="material-symbols-outlined text-[14px] text-primary">schedule</span>
-          <span>{customRangeLabel}</span>
-          <button
-            type="button"
-            onClick={() => {
-              setRange("30d");
-              setCustomStart("");
-              setCustomEnd("");
-            }}
-            className="text-text-muted hover:text-error transition-colors"
-            title="Clear custom range"
-          >
-            <span className="material-symbols-outlined text-[14px]">close</span>
-          </button>
-        </div>
-      )}
-
-      {/* Active key filter indicator */}
-      {selectedApiKeys.length > 0 && (
-        <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="material-symbols-outlined text-[14px] text-primary">filter_alt</span>
-          <span>
-            Filtered by {selectedApiKeys.length} API key{selectedApiKeys.length > 1 ? "s" : ""}
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedApiKeys([])}
-            className="text-text-muted hover:text-error transition-colors"
-            title="Clear key filter"
-          >
-            <span className="material-symbols-outlined text-[14px]">close</span>
-          </button>
-        </div>
-      )}
 
       {/* Primary KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
