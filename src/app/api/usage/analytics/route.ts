@@ -32,7 +32,7 @@ function getRangeStartIso(range: string): string | null {
 
 function shortModelName(model: string | null): string {
   if (!model) return "-";
-  const parts = model.split(/[/:-]/);
+  const parts = model.split("/");
   return parts[parts.length - 1] || model;
 }
 
@@ -136,6 +136,38 @@ export async function GET(request: Request) {
     const presetsParam = searchParams.get("presets");
 
     const db = getDbInstance();
+
+    // ── Enrich entries with missing apiKeyName ──────────────────────────
+    try {
+      db.exec(`
+        UPDATE usage_history
+        SET 
+          api_key_name = (
+            SELECT api_key_name
+            FROM usage_history AS uh2
+            WHERE uh2.connection_id = usage_history.connection_id
+              AND uh2.api_key_name IS NOT NULL
+              AND uh2.api_key_name != ''
+            GROUP BY uh2.api_key_name
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+          ),
+          api_key_id = (
+            SELECT api_key_id
+            FROM usage_history AS uh2
+            WHERE uh2.connection_id = usage_history.connection_id
+              AND uh2.api_key_id IS NOT NULL
+              AND uh2.api_key_id != ''
+            GROUP BY uh2.api_key_id
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+          )
+        WHERE (api_key_name IS NULL OR api_key_name = '')
+          AND connection_id IS NOT NULL;
+      `);
+    } catch (e) {
+      console.error("Failed to backfill api key names", e);
+    }
 
     const conditions = [];
     const params: Record<string, string> = {};
@@ -325,7 +357,7 @@ export async function GET(request: Request) {
       .prepare(
         `
         SELECT
-          connection_id as account,
+          COALESCE((SELECT COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), connection_id) FROM provider_connections c WHERE c.id = connection_id), connection_id, 'unknown') as account,
           provider,
           model,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
@@ -335,7 +367,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(tokens_reasoning), 0) as reasoningTokens
         FROM usage_history
         ${whereClause}
-        GROUP BY connection_id, provider, model
+        GROUP BY account, provider, model
       `
       )
       .all(params) as Array<Record<string, unknown>>;
@@ -344,7 +376,7 @@ export async function GET(request: Request) {
       .prepare(
         `
         SELECT
-          connection_id as account,
+          COALESCE((SELECT COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), connection_id) FROM provider_connections c WHERE c.id = connection_id), connection_id, 'unknown') as account,
           COUNT(*) as requests,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
           COALESCE(SUM(tokens_output), 0) as completionTokens,
@@ -353,7 +385,7 @@ export async function GET(request: Request) {
           COALESCE(MAX(timestamp), '') as lastUsed
         FROM usage_history
         ${whereClause}
-        GROUP BY connection_id
+        GROUP BY account
         ORDER BY requests DESC
         LIMIT 50
       `
@@ -650,6 +682,24 @@ export async function GET(request: Request) {
       }
     }
 
+    const dailyByModelMap: Record<string, Record<string, number>> = {};
+    const allModels = new Set<string>();
+
+    for (const row of dailyCostRows) {
+      const date = row.date as string;
+      const model = shortModelName(row.model as string);
+      const tokens = Number(row.promptTokens) + Number(row.completionTokens);
+
+      if (!dailyByModelMap[date]) dailyByModelMap[date] = {};
+      dailyByModelMap[date][model] = (dailyByModelMap[date][model] || 0) + tokens;
+      allModels.add(model);
+    }
+
+    const dailyByModel = Object.keys(dailyByModelMap)
+      .sort()
+      .map((date) => ({ date, ...dailyByModelMap[date] }));
+    const modelNames = Array.from(allModels);
+
     const analytics = {
       summary,
       dailyTrend,
@@ -661,6 +711,8 @@ export async function GET(request: Request) {
       weeklyPattern,
       weeklyTokens,
       weeklyCounts,
+      dailyByModel,
+      modelNames,
       range,
     } as any;
 
