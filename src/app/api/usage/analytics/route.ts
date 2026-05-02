@@ -98,17 +98,42 @@ function resolveModelPricing(
     }
   }
 
-  if (!providerPricing) return null;
+  // Hardcoded known fallbacks
+  if (!providerPricing) {
+    if (pLower === "antigravity") providerPricing = findKeyInsensitive(pricingByProvider, "ag");
+  }
 
   const normalizedModel = normalizeModelName(model);
   const shortModel = shortModelName(model);
+  const hyphenModel = model.replace(/\./g, "-");
+  const hyphenNormalized = normalizedModel.replace(/\./g, "-");
 
-  return (
-    findKeyInsensitive(providerPricing, model) ||
-    findKeyInsensitive(providerPricing, normalizedModel) ||
-    findKeyInsensitive(providerPricing, shortModel) ||
-    null
-  );
+  const tryFind = (prov: Record<string, unknown> | null | undefined) => {
+    if (!prov || typeof prov !== "object") return null;
+    return (
+      findKeyInsensitive(prov as Record<string, unknown>, model) ||
+      findKeyInsensitive(prov as Record<string, unknown>, normalizedModel) ||
+      findKeyInsensitive(prov as Record<string, unknown>, shortModel) ||
+      findKeyInsensitive(prov as Record<string, unknown>, hyphenModel) ||
+      findKeyInsensitive(prov as Record<string, unknown>, hyphenNormalized) ||
+      null
+    );
+  };
+
+  let pricing = providerPricing ? tryFind(providerPricing) : null;
+
+  if (!pricing) {
+    // Global fallback: search all providers for this exact model (helps with aliases)
+    for (const prov of Object.values(pricingByProvider)) {
+      const found = tryFind(prov as Record<string, unknown>);
+      if (found) {
+        pricing = found;
+        break;
+      }
+    }
+  }
+
+  return pricing as Record<string, unknown> | null;
 }
 
 function computeUsageRowCost(
