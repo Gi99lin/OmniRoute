@@ -385,17 +385,17 @@ export async function GET(request: Request) {
         `
         SELECT
           COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), usage_history.connection_id, 'unknown') as account,
-          LOWER(provider) as provider,
-          LOWER(model) as model,
-          COALESCE(SUM(tokens_input), 0) as promptTokens,
-          COALESCE(SUM(tokens_output), 0) as completionTokens,
-          COALESCE(SUM(tokens_cache_read), 0) as cacheReadTokens,
-          COALESCE(SUM(tokens_cache_creation), 0) as cacheCreationTokens,
-          COALESCE(SUM(tokens_reasoning), 0) as reasoningTokens
+          LOWER(usage_history.provider) as provider,
+          LOWER(usage_history.model) as model,
+          COALESCE(SUM(usage_history.tokens_input), 0) as promptTokens,
+          COALESCE(SUM(usage_history.tokens_output), 0) as completionTokens,
+          COALESCE(SUM(usage_history.tokens_cache_read), 0) as cacheReadTokens,
+          COALESCE(SUM(usage_history.tokens_cache_creation), 0) as cacheCreationTokens,
+          COALESCE(SUM(usage_history.tokens_reasoning), 0) as reasoningTokens
         FROM usage_history
         LEFT JOIN provider_connections c ON c.id = usage_history.connection_id
-        ${whereClause}
-        GROUP BY account, LOWER(provider), LOWER(model)
+        ${whereClause.replace(/timestamp/g, "usage_history.timestamp").replace(/api_key_/g, "usage_history.api_key_")}
+        GROUP BY account, LOWER(usage_history.provider), LOWER(usage_history.model)
       `
       )
       .all(params) as Array<Record<string, unknown>>;
@@ -406,14 +406,14 @@ export async function GET(request: Request) {
         SELECT
           COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), usage_history.connection_id, 'unknown') as account,
           COUNT(usage_history.id) as requests,
-          COALESCE(SUM(tokens_input), 0) as promptTokens,
-          COALESCE(SUM(tokens_output), 0) as completionTokens,
-          COALESCE(SUM(tokens_input + tokens_output), 0) as totalTokens,
-          COALESCE(AVG(latency_ms), 0) as avgLatencyMs,
-          COALESCE(MAX(timestamp), '') as lastUsed
+          COALESCE(SUM(usage_history.tokens_input), 0) as promptTokens,
+          COALESCE(SUM(usage_history.tokens_output), 0) as completionTokens,
+          COALESCE(SUM(usage_history.tokens_input + usage_history.tokens_output), 0) as totalTokens,
+          COALESCE(AVG(usage_history.latency_ms), 0) as avgLatencyMs,
+          COALESCE(MAX(usage_history.timestamp), '') as lastUsed
         FROM usage_history
         LEFT JOIN provider_connections c ON c.id = usage_history.connection_id
-        ${whereClause}
+        ${whereClause.replace(/timestamp/g, "usage_history.timestamp").replace(/api_key_/g, "usage_history.api_key_")}
         GROUP BY account
         ORDER BY requests DESC
         LIMIT 50
