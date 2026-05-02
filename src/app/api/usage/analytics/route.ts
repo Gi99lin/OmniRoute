@@ -30,12 +30,6 @@ function getRangeStartIso(range: string): string | null {
   return start.toISOString();
 }
 
-function shortModelName(model: string | null): string {
-  if (!model) return "-";
-  const parts = model.split("/");
-  return parts[parts.length - 1] || model;
-}
-
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type PricingByProvider = Record<string, Record<string, Record<string, unknown>>>;
@@ -67,12 +61,7 @@ function appendWhereCondition(whereClause: string, condition: string): string {
 
 function findKeyInsensitive(obj: Record<string, any> | undefined | null, key: string): any {
   if (!obj || !key) return undefined;
-  if (obj[key] !== undefined) return obj[key];
-  const lowerKey = key.toLowerCase();
-  for (const [k, v] of Object.entries(obj)) {
-    if (k.toLowerCase() === lowerKey) return v;
-  }
-  return undefined;
+  return obj[key.toLowerCase()];
 }
 
 function resolveModelPricing(
@@ -82,10 +71,9 @@ function resolveModelPricing(
   model: string,
   normalizeModelName: (model: string) => string
 ): Record<string, unknown> | null {
-  const p = providerRaw || "";
-  const pLower = p.toLowerCase();
+  const pLower = (providerRaw || "").toLowerCase();
 
-  let providerPricing = findKeyInsensitive(pricingByProvider, p);
+  let providerPricing = findKeyInsensitive(pricingByProvider, pLower);
   if (!providerPricing) {
     const alias = providerAliasMap[pLower];
     if (alias) {
@@ -103,15 +91,16 @@ function resolveModelPricing(
     if (pLower === "antigravity") providerPricing = findKeyInsensitive(pricingByProvider, "ag");
   }
 
-  const normalizedModel = normalizeModelName(model);
-  const shortModel = shortModelName(model);
-  const hyphenModel = model.replace(/\./g, "-");
+  const normalizedModel = normalizeModelName(model).toLowerCase();
+  const shortModel = normalizedModel; // normalizeModelName behaves exactly like shortModelName
+  const hyphenModel = model.toLowerCase().replace(/\./g, "-");
   const hyphenNormalized = normalizedModel.replace(/\./g, "-");
+  const lowerModel = model.toLowerCase();
 
   const tryFind = (prov: Record<string, unknown> | null | undefined) => {
     if (!prov || typeof prov !== "object") return null;
     return (
-      findKeyInsensitive(prov as Record<string, unknown>, model) ||
+      findKeyInsensitive(prov as Record<string, unknown>, lowerModel) ||
       findKeyInsensitive(prov as Record<string, unknown>, normalizedModel) ||
       findKeyInsensitive(prov as Record<string, unknown>, shortModel) ||
       findKeyInsensitive(prov as Record<string, unknown>, hyphenModel) ||
@@ -196,38 +185,6 @@ export async function GET(request: Request) {
 
     const db = getDbInstance();
 
-    // ── Enrich entries with missing apiKeyName ──────────────────────────
-    try {
-      db.exec(`
-        UPDATE usage_history
-        SET 
-          api_key_name = (
-            SELECT api_key_name
-            FROM usage_history AS uh2
-            WHERE uh2.connection_id = usage_history.connection_id
-              AND uh2.api_key_name IS NOT NULL
-              AND uh2.api_key_name != ''
-            GROUP BY uh2.api_key_name
-            ORDER BY COUNT(*) DESC
-            LIMIT 1
-          ),
-          api_key_id = (
-            SELECT api_key_id
-            FROM usage_history AS uh2
-            WHERE uh2.connection_id = usage_history.connection_id
-              AND uh2.api_key_id IS NOT NULL
-              AND uh2.api_key_id != ''
-            GROUP BY uh2.api_key_id
-            ORDER BY COUNT(*) DESC
-            LIMIT 1
-          )
-        WHERE (api_key_name IS NULL OR api_key_name = '')
-          AND connection_id IS NOT NULL;
-      `);
-    } catch (e) {
-      console.error("Failed to backfill api key names", e);
-    }
-
     const conditions = [];
     const params: Record<string, string> = {};
 
@@ -254,7 +211,17 @@ export async function GET(request: Request) {
 
     // Fetch pricing data for cost calculation (no rows loaded)
     const { getPricing } = await import("@/lib/db/settings");
-    const pricingByProvider = (await getPricing()) as PricingByProvider;
+    const rawPricingByProvider = (await getPricing()) as PricingByProvider;
+
+    // Pre-process pricing data to lowercase keys for O(1) lookups
+    const pricingByProvider: PricingByProvider = {};
+    for (const [providerKey, providerVal] of Object.entries(rawPricingByProvider || {})) {
+      const lowerProvider = {};
+      for (const [modelKey, modelVal] of Object.entries(providerVal || {})) {
+        (lowerProvider as any)[modelKey.toLowerCase()] = modelVal;
+      }
+      pricingByProvider[providerKey.toLowerCase()] = lowerProvider;
+    }
     const { computeCostFromPricing, normalizeModelName } =
       await import("@/lib/usage/costCalculator");
     const { PROVIDER_ID_TO_ALIAS } = await import("@omniroute/open-sse/config/providerModels");
@@ -417,7 +384,7 @@ export async function GET(request: Request) {
       .prepare(
         `
         SELECT
-          COALESCE((SELECT COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), connection_id) FROM provider_connections c WHERE c.id = connection_id), connection_id, 'unknown') as account,
+          COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), usage_history.connection_id, 'unknown') as account,
           LOWER(provider) as provider,
           LOWER(model) as model,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
@@ -426,6 +393,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(tokens_cache_creation), 0) as cacheCreationTokens,
           COALESCE(SUM(tokens_reasoning), 0) as reasoningTokens
         FROM usage_history
+        LEFT JOIN provider_connections c ON c.id = usage_history.connection_id
         ${whereClause}
         GROUP BY account, LOWER(provider), LOWER(model)
       `
@@ -436,14 +404,15 @@ export async function GET(request: Request) {
       .prepare(
         `
         SELECT
-          COALESCE((SELECT COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), connection_id) FROM provider_connections c WHERE c.id = connection_id), connection_id, 'unknown') as account,
-          COUNT(*) as requests,
+          COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), usage_history.connection_id, 'unknown') as account,
+          COUNT(usage_history.id) as requests,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
           COALESCE(SUM(tokens_output), 0) as completionTokens,
           COALESCE(SUM(tokens_input + tokens_output), 0) as totalTokens,
           COALESCE(AVG(latency_ms), 0) as avgLatencyMs,
           COALESCE(MAX(timestamp), '') as lastUsed
         FROM usage_history
+        LEFT JOIN provider_connections c ON c.id = usage_history.connection_id
         ${whereClause}
         GROUP BY account
         ORDER BY requests DESC
@@ -566,20 +535,6 @@ export async function GET(request: Request) {
       streak: 0,
     };
 
-    const dailyCostByDate = new Map<string, number>();
-    for (const row of dailyCostRows) {
-      const date = toStringValue(row.date);
-      if (!date) continue;
-      const cost = computeUsageRowCost(
-        row,
-        pricingByProvider,
-        PROVIDER_ID_TO_ALIAS,
-        normalizeModelName,
-        computeCostFromPricing
-      );
-      dailyCostByDate.set(date, (dailyCostByDate.get(date) || 0) + cost);
-    }
-
     const dailyTrend = dailyRows.map((row) => ({
       date: row.date,
       requests: Number(row.requests),
@@ -598,7 +553,7 @@ export async function GET(request: Request) {
     const byModel = modelRows.map((row) => {
       const model = row.model as string;
       const provider = row.provider as string;
-      const short = shortModelName(model);
+      const short = normalizeModelName(model);
       const tokens = {
         input: Number(row.promptTokens) || 0,
         output: Number(row.completionTokens) || 0,
@@ -753,9 +708,23 @@ export async function GET(request: Request) {
     const dailyByModelMap: Record<string, Record<string, number>> = {};
     const allModels = new Set<string>();
 
+    const dailyCostByDate = new Map<string, number>();
     for (const row of dailyCostRows) {
-      const date = row.date as string;
-      const model = shortModelName(row.model as string);
+      const date = toStringValue(row.date);
+      if (!date) continue;
+
+      // Calculate costs
+      const cost = computeUsageRowCost(
+        row,
+        pricingByProvider,
+        PROVIDER_ID_TO_ALIAS,
+        normalizeModelName,
+        computeCostFromPricing
+      );
+      dailyCostByDate.set(date, (dailyCostByDate.get(date) || 0) + cost);
+
+      // Group tokens by model for the day
+      const model = normalizeModelName(row.model as string);
       const tokens = Number(row.promptTokens) + Number(row.completionTokens);
 
       if (!dailyByModelMap[date]) dailyByModelMap[date] = {};
