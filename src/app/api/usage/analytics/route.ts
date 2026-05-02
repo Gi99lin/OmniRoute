@@ -535,6 +535,33 @@ export async function GET(request: Request) {
       streak: 0,
     };
 
+    const dailyByModelMap: Record<string, Record<string, number>> = {};
+    const allModels = new Set<string>();
+
+    const dailyCostByDate = new Map<string, number>();
+    for (const row of dailyCostRows) {
+      const date = toStringValue(row.date);
+      if (!date) continue;
+
+      // Calculate costs
+      const cost = computeUsageRowCost(
+        row,
+        pricingByProvider,
+        PROVIDER_ID_TO_ALIAS,
+        normalizeModelName,
+        computeCostFromPricing
+      );
+      dailyCostByDate.set(date, (dailyCostByDate.get(date) || 0) + cost);
+
+      // Group tokens by model for the day
+      const model = normalizeModelName(row.model as string);
+      const tokens = Number(row.promptTokens) + Number(row.completionTokens);
+
+      if (!dailyByModelMap[date]) dailyByModelMap[date] = {};
+      dailyByModelMap[date][model] = (dailyByModelMap[date][model] || 0) + tokens;
+      allModels.add(model);
+    }
+
     const dailyTrend = dailyRows.map((row) => ({
       date: row.date,
       requests: Number(row.requests),
@@ -703,33 +730,6 @@ export async function GET(request: Request) {
           totalTokens,
         };
       }
-    }
-
-    const dailyByModelMap: Record<string, Record<string, number>> = {};
-    const allModels = new Set<string>();
-
-    const dailyCostByDate = new Map<string, number>();
-    for (const row of dailyCostRows) {
-      const date = toStringValue(row.date);
-      if (!date) continue;
-
-      // Calculate costs
-      const cost = computeUsageRowCost(
-        row,
-        pricingByProvider,
-        PROVIDER_ID_TO_ALIAS,
-        normalizeModelName,
-        computeCostFromPricing
-      );
-      dailyCostByDate.set(date, (dailyCostByDate.get(date) || 0) + cost);
-
-      // Group tokens by model for the day
-      const model = normalizeModelName(row.model as string);
-      const tokens = Number(row.promptTokens) + Number(row.completionTokens);
-
-      if (!dailyByModelMap[date]) dailyByModelMap[date] = {};
-      dailyByModelMap[date][model] = (dailyByModelMap[date][model] || 0) + tokens;
-      allModels.add(model);
     }
 
     const dailyByModel = Object.keys(dailyByModelMap)
