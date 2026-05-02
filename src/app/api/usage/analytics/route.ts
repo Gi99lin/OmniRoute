@@ -277,8 +277,8 @@ export async function GET(request: Request) {
         `
         SELECT
           DATE(timestamp) as date,
-          provider,
-          model,
+          LOWER(provider) as provider,
+          LOWER(model) as model,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
           COALESCE(SUM(tokens_output), 0) as completionTokens,
           COALESCE(SUM(tokens_cache_read), 0) as cacheReadTokens,
@@ -286,7 +286,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(tokens_reasoning), 0) as reasoningTokens
         FROM usage_history
         ${whereClause}
-        GROUP BY DATE(timestamp), provider, model
+        GROUP BY DATE(timestamp), LOWER(provider), LOWER(model)
         ORDER BY date ASC
       `
       )
@@ -330,8 +330,8 @@ export async function GET(request: Request) {
       .prepare(
         `
         SELECT
-          model,
-          provider,
+          LOWER(model) as model,
+          LOWER(provider) as provider,
           COUNT(*) as requests,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
           COALESCE(SUM(tokens_output), 0) as completionTokens,
@@ -344,7 +344,7 @@ export async function GET(request: Request) {
           COALESCE(MAX(timestamp), '') as lastUsed
         FROM usage_history
         ${whereClause}
-        GROUP BY model, provider
+        GROUP BY LOWER(model), LOWER(provider)
         ORDER BY requests DESC
         LIMIT 50
       `
@@ -355,8 +355,8 @@ export async function GET(request: Request) {
       .prepare(
         `
         SELECT
-          provider,
-          model,
+          LOWER(provider) as provider,
+          LOWER(model) as model,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
           COALESCE(SUM(tokens_output), 0) as completionTokens,
           COALESCE(SUM(tokens_cache_read), 0) as cacheReadTokens,
@@ -364,7 +364,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(tokens_reasoning), 0) as reasoningTokens
         FROM usage_history
         ${whereClause}
-        GROUP BY provider, model
+        GROUP BY LOWER(provider), LOWER(model)
       `
       )
       .all(params) as Array<Record<string, unknown>>;
@@ -373,7 +373,7 @@ export async function GET(request: Request) {
       .prepare(
         `
         SELECT
-          provider,
+          LOWER(provider) as provider,
           COUNT(*) as requests,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
           COALESCE(SUM(tokens_output), 0) as completionTokens,
@@ -382,7 +382,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0) as successfulRequests
         FROM usage_history
         ${whereClause}
-        GROUP BY provider
+        GROUP BY LOWER(provider)
         ORDER BY requests DESC
       `
       )
@@ -393,8 +393,8 @@ export async function GET(request: Request) {
         `
         SELECT
           COALESCE((SELECT COALESCE(NULLIF(c.display_name, ''), NULLIF(c.email, ''), NULLIF(c.name, ''), connection_id) FROM provider_connections c WHERE c.id = connection_id), connection_id, 'unknown') as account,
-          provider,
-          model,
+          LOWER(provider) as provider,
+          LOWER(model) as model,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
           COALESCE(SUM(tokens_output), 0) as completionTokens,
           COALESCE(SUM(tokens_cache_read), 0) as cacheReadTokens,
@@ -402,7 +402,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(tokens_reasoning), 0) as reasoningTokens
         FROM usage_history
         ${whereClause}
-        GROUP BY account, provider, model
+        GROUP BY account, LOWER(provider), LOWER(model)
       `
       )
       .all(params) as Array<Record<string, unknown>>;
@@ -427,15 +427,18 @@ export async function GET(request: Request) {
       )
       .all(params) as Array<Record<string, unknown>>;
 
-    const apiKeyWhereClause = whereClause;
+    const apiKeyWhereClause = appendWhereCondition(
+      whereClause,
+      "(api_key_id IS NOT NULL AND api_key_id != '') OR (api_key_name IS NOT NULL AND api_key_name != '')"
+    );
     const apiKeyRows = db
       .prepare(
         `
         SELECT
           api_key_id as apiKeyId,
           COALESCE(NULLIF(api_key_name, ''), NULLIF(api_key_id, ''), 'Unknown API key') as apiKeyName,
-          provider,
-          model,
+          LOWER(provider) as provider,
+          LOWER(model) as model,
           COUNT(*) as requests,
           COALESCE(SUM(tokens_input), 0) as promptTokens,
           COALESCE(SUM(tokens_output), 0) as completionTokens,
@@ -445,7 +448,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(tokens_input + tokens_output), 0) as totalTokens
         FROM usage_history
         ${apiKeyWhereClause}
-        GROUP BY api_key_id, api_key_name, provider, model
+        GROUP BY api_key_id, api_key_name, LOWER(provider), LOWER(model)
       `
       )
       .all(params) as Array<Record<string, unknown>>;
@@ -791,8 +794,8 @@ export async function GET(request: Request) {
           .prepare(
             `
             SELECT
-              model,
-              provider,
+              LOWER(model) as model,
+              LOWER(provider) as provider,
               COALESCE(SUM(tokens_input), 0) as promptTokens,
               COALESCE(SUM(tokens_output), 0) as completionTokens,
               COALESCE(SUM(tokens_cache_read), 0) as cacheReadTokens,
@@ -800,7 +803,7 @@ export async function GET(request: Request) {
               COALESCE(SUM(tokens_reasoning), 0) as reasoningTokens
             FROM usage_history
             ${presetWhere}
-            GROUP BY model, provider
+            GROUP BY LOWER(model), LOWER(provider)
           `
           )
           .all(presetParams) as Array<Record<string, unknown>>;
