@@ -65,6 +65,16 @@ function appendWhereCondition(whereClause: string, condition: string): string {
   return whereClause ? `${whereClause} AND (${condition})` : `WHERE (${condition})`;
 }
 
+function findKeyInsensitive(obj: Record<string, any> | undefined | null, key: string): any {
+  if (!obj || !key) return undefined;
+  if (obj[key] !== undefined) return obj[key];
+  const lowerKey = key.toLowerCase();
+  for (const [k, v] of Object.entries(obj)) {
+    if (k.toLowerCase() === lowerKey) return v;
+  }
+  return undefined;
+}
+
 function resolveModelPricing(
   pricingByProvider: PricingByProvider,
   providerAliasMap: Record<string, string>,
@@ -72,17 +82,18 @@ function resolveModelPricing(
   model: string,
   normalizeModelName: (model: string) => string
 ): Record<string, unknown> | null {
-  const p = (providerRaw || "").toLowerCase();
+  const p = providerRaw || "";
+  const pLower = p.toLowerCase();
 
-  let providerPricing = pricingByProvider[p];
+  let providerPricing = findKeyInsensitive(pricingByProvider, p);
   if (!providerPricing) {
-    const alias = providerAliasMap[p];
-    if (alias && pricingByProvider[alias]) {
-      providerPricing = pricingByProvider[alias];
+    const alias = providerAliasMap[pLower];
+    if (alias) {
+      providerPricing = findKeyInsensitive(pricingByProvider, alias);
     } else {
-      const np = p.replace(/-cn$/, "");
-      if (np && np !== p && pricingByProvider[np]) {
-        providerPricing = pricingByProvider[np];
+      const np = pLower.replace(/-cn$/, "");
+      if (np && np !== pLower) {
+        providerPricing = findKeyInsensitive(pricingByProvider, np);
       }
     }
   }
@@ -91,10 +102,11 @@ function resolveModelPricing(
 
   const normalizedModel = normalizeModelName(model);
   const shortModel = shortModelName(model);
+
   return (
-    providerPricing[model] ||
-    providerPricing[normalizedModel] ||
-    providerPricing[shortModel] ||
+    findKeyInsensitive(providerPricing, model) ||
+    findKeyInsensitive(providerPricing, normalizedModel) ||
+    findKeyInsensitive(providerPricing, shortModel) ||
     null
   );
 }
