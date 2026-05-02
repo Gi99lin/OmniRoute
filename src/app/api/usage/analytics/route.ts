@@ -67,11 +67,26 @@ function appendWhereCondition(whereClause: string, condition: string): string {
 
 function resolveModelPricing(
   pricingByProvider: PricingByProvider,
-  provider: string,
+  providerAliasMap: Record<string, string>,
+  providerRaw: string,
   model: string,
   normalizeModelName: (model: string) => string
 ): Record<string, unknown> | null {
-  const providerPricing = pricingByProvider[provider];
+  const p = (providerRaw || "").toLowerCase();
+
+  let providerPricing = pricingByProvider[p];
+  if (!providerPricing) {
+    const alias = providerAliasMap[p];
+    if (alias && pricingByProvider[alias]) {
+      providerPricing = pricingByProvider[alias];
+    } else {
+      const np = p.replace(/-cn$/, "");
+      if (np && np !== p && pricingByProvider[np]) {
+        providerPricing = pricingByProvider[np];
+      }
+    }
+  }
+
   if (!providerPricing) return null;
 
   const normalizedModel = normalizeModelName(model);
@@ -87,6 +102,7 @@ function resolveModelPricing(
 function computeUsageRowCost(
   row: Record<string, unknown>,
   pricingByProvider: PricingByProvider,
+  providerAliasMap: Record<string, string>,
   normalizeModelName: (model: string) => string,
   computeCostFromPricing: ComputeCostFromPricing
 ): number {
@@ -94,7 +110,13 @@ function computeUsageRowCost(
   const model = toStringValue(row.model);
   if (!provider || !model) return 0;
 
-  const pricing = resolveModelPricing(pricingByProvider, provider, model, normalizeModelName);
+  const pricing = resolveModelPricing(
+    pricingByProvider,
+    providerAliasMap,
+    provider,
+    model,
+    normalizeModelName
+  );
   if (!pricing) return 0;
 
   return computeCostFromPricing(pricing, {
@@ -198,6 +220,7 @@ export async function GET(request: Request) {
     const pricingByProvider = (await getPricing()) as PricingByProvider;
     const { computeCostFromPricing, normalizeModelName } =
       await import("@/lib/usage/costCalculator");
+    const { PROVIDER_ID_TO_ALIAS } = await import("@omniroute/open-sse/config/providerModels");
 
     const summaryRow = db
       .prepare(
@@ -510,6 +533,7 @@ export async function GET(request: Request) {
       const cost = computeUsageRowCost(
         row,
         pricingByProvider,
+        PROVIDER_ID_TO_ALIAS,
         normalizeModelName,
         computeCostFromPricing
       );
@@ -542,6 +566,7 @@ export async function GET(request: Request) {
       const cost = computeUsageRowCost(
         row,
         pricingByProvider,
+        PROVIDER_ID_TO_ALIAS,
         normalizeModelName,
         computeCostFromPricing
       );
@@ -573,6 +598,7 @@ export async function GET(request: Request) {
       const cost = computeUsageRowCost(
         row,
         pricingByProvider,
+        PROVIDER_ID_TO_ALIAS,
         normalizeModelName,
         computeCostFromPricing
       );
@@ -599,6 +625,7 @@ export async function GET(request: Request) {
       const cost = computeUsageRowCost(
         row,
         pricingByProvider,
+        PROVIDER_ID_TO_ALIAS,
         normalizeModelName,
         computeCostFromPricing
       );
@@ -651,6 +678,7 @@ export async function GET(request: Request) {
       existing.cost += computeUsageRowCost(
         row,
         pricingByProvider,
+        PROVIDER_ID_TO_ALIAS,
         normalizeModelName,
         computeCostFromPricing
       );
@@ -770,6 +798,7 @@ export async function GET(request: Request) {
           presetTotalCost += computeUsageRowCost(
             row,
             pricingByProvider,
+            PROVIDER_ID_TO_ALIAS,
             normalizeModelName,
             computeCostFromPricing
           );
