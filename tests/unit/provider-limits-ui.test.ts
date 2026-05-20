@@ -44,6 +44,34 @@ test("Claude providerSpecificData plan is used when live plan is missing", () =>
   assert.equal(tier.variant, "success");
 });
 
+test("Claude bootstrap rate_limit_tier maps default_claude_max_20x to Max 20x", () => {
+  const resolvedPlan = providerLimitUtils.resolvePlanValue(null, {
+    organizationType: "default_claude_ai",
+    organizationRateLimitTier: "default_claude_max_20x",
+  });
+
+  assert.equal(resolvedPlan, "default_claude_max_20x");
+  const tier = providerLimitUtils.normalizePlanTier(resolvedPlan);
+  assert.equal(tier.key, "ultra");
+  assert.equal(tier.label, "Max 20x");
+});
+
+test("Claude organization_type default_claude_ai is ignored without rate_limit_tier", () => {
+  const resolvedPlan = providerLimitUtils.resolvePlanValue("Claude Code", {
+    organizationType: "default_claude_ai",
+  });
+
+  assert.equal(resolvedPlan, null);
+  const tier = providerLimitUtils.normalizePlanTier(resolvedPlan);
+  assert.equal(tier.label, "Unknown");
+});
+
+test("MiniMax coding plan title maps to Pro tier badge", () => {
+  const tier = providerLimitUtils.normalizePlanTier("MiniMax Coding Plan Pro");
+  assert.equal(tier.key, "pro");
+  assert.equal(tier.label, "Pro");
+});
+
 test("remaining percentage helpers reflect remaining quota and stale resets refill to 100", () => {
   assert.equal(providerLimitUtils.calculatePercentage(0, 100), 100);
   assert.equal(providerLimitUtils.calculatePercentage(17, 100), 83);

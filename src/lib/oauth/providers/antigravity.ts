@@ -110,14 +110,21 @@ export const antigravity = {
       }
     }
 
-    return { userInfo, projectId };
+    return { userInfo, projectId, tierId };
   },
-  mapTokens: (tokens, extra) => ({
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    expiresIn: tokens.expires_in,
-    scope: tokens.scope,
-    email: extra?.userInfo?.email,
-    projectId: extra?.projectId,
-  }),
+  mapTokens: (tokens, extra) => {
+    const providerSpecificData: Record<string, string> = {};
+    if (extra?.projectId) providerSpecificData.projectId = String(extra.projectId);
+    if (extra?.tierId) providerSpecificData.tier = String(extra.tierId);
+
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresIn: tokens.expires_in,
+      scope: tokens.scope,
+      email: extra?.userInfo?.email,
+      projectId: extra?.projectId,
+      ...(Object.keys(providerSpecificData).length > 0 ? { providerSpecificData } : {}),
+    };
+  },
 };

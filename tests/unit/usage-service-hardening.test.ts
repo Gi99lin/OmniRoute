@@ -589,7 +589,7 @@ test("usage service covers Claude default-plan fallback, legacy org denial and f
     provider: "claude",
     accessToken: "claude-default",
   });
-  assert.equal(defaultPlan.plan, "Claude Code");
+  assert.equal(defaultPlan.plan, undefined);
   assert.equal(defaultPlan.extraUsage, null);
 
   globalThis.fetch = async (url) => {
@@ -1020,6 +1020,7 @@ test("usage service covers MiniMax usage parsing, documented endpoint fallback a
       return new Response(
         JSON.stringify({
           base_resp: { status_code: 0, status_msg: "ok" },
+          plan_name: "MiniMax Coding Plan Lite",
           model_remains: [
             {
               model_name: "MiniMax-M2.7",
@@ -1069,6 +1070,7 @@ test("usage service covers MiniMax usage parsing, documented endpoint fallback a
       "https://api.minimax.io/v1/api/openplatform/coding_plan/remains",
     ]
   );
+  assert.equal(usage.plan, "Lite");
   assert.equal(usage.quotas["session (5h)"].used, 400);
   assert.equal(usage.quotas["session (5h)"].total, 1500);
   assert.equal(usage.quotas["session (5h)"].remaining, 1100);
@@ -1261,6 +1263,19 @@ test("usage helper branches cover Gemini CLI and Antigravity plan label fallback
   assert.equal(
     __testing.getAntigravityPlanLabel({
       allowedTiers: [{ id: "tier_pro", isDefault: true }],
+    }),
+    "Pro"
+  );
+  assert.equal(
+    __testing.getAntigravityPlanLabel({
+      allowedTiers: [{ id: "free-tier", isDefault: true }],
+      currentTier: { id: "tier_pro" },
+    }),
+    "Pro"
+  );
+  assert.equal(
+    __testing.getAntigravityPlanLabel({
+      currentTier: { id: "google_one_ai_pro" },
     }),
     "Pro"
   );
