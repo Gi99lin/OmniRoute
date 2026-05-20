@@ -66,10 +66,14 @@ test("Claude organization_type default_claude_ai is ignored without rate_limit_t
   assert.equal(tier.label, "Unknown");
 });
 
-test("MiniMax coding plan title maps to Pro tier badge", () => {
-  const tier = providerLimitUtils.normalizePlanTier("MiniMax Coding Plan Pro");
-  assert.equal(tier.key, "pro");
-  assert.equal(tier.label, "Pro");
+test("MiniMax coding plan titles map to tier badges", () => {
+  const proTier = providerLimitUtils.normalizePlanTier("MiniMax Coding Plan Pro");
+  assert.equal(proTier.key, "pro");
+  assert.equal(proTier.label, "Pro");
+
+  const starterTier = providerLimitUtils.normalizePlanTier("Starter");
+  assert.equal(starterTier.key, "lite");
+  assert.equal(starterTier.label, "Starter");
 });
 
 test("remaining percentage helpers reflect remaining quota and stale resets refill to 100", () => {

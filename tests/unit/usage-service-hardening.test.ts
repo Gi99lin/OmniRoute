@@ -480,7 +480,7 @@ test("usage service handles missing Antigravity access tokens without probing up
   assert.match(usage.message, /Antigravity access token not available/i);
 });
 
-test("usage service covers Antigravity tier fallbacks and non-403 upstream failures", async () => {
+test("usage service preserves Antigravity plan when model quotas fail", async () => {
   globalThis.fetch = async (url) => {
     if (String(url).includes("loadCodeAssist")) {
       return new Response(
@@ -497,6 +497,8 @@ test("usage service covers Antigravity tier fallbacks and non-403 upstream failu
     provider: "antigravity",
     accessToken: "ag-failed",
   });
+  assert.equal(failedUsage.plan, "Business");
+  assert.deepEqual(failedUsage.subscriptionInfo, { currentTier: { displayName: "Standard" } });
   assert.match(failedUsage.message, /Antigravity error: Antigravity API error: 500/i);
 });
 
@@ -1117,6 +1119,7 @@ test("usage service treats MiniMax token-plan counts as used usage", async () =>
     apiKey: "minimax-key",
   });
 
+  assert.equal(usage.plan, "Max");
   assert.equal(usage.quotas["session (5h)"].used, 13);
   assert.equal(usage.quotas["session (5h)"].remaining, 14987);
   assert.equal(usage.quotas["session (5h)"].remainingPercentage, 99.91333333333333);
@@ -1273,6 +1276,25 @@ test("usage helper branches cover Gemini CLI and Antigravity plan label fallback
     }),
     "Pro"
   );
+  assert.equal(
+    __testing.getAntigravityPlanLabel({
+      allowedTiers: [{ id: "free-tier", isDefault: true }],
+      currentTier: { displayName: "Standard" },
+    }),
+    "Business"
+  );
+  assert.equal(
+    __testing.getAntigravityPlanLabel({
+      tier: "tier_google_one_ai_pro",
+    }),
+    "Pro"
+  );
+  assert.equal(
+    __testing.getMiniMaxPlanLabel({}, [{ current_interval_total_count: 1500 }]),
+    "Starter"
+  );
+  assert.equal(__testing.getMiniMaxPlanLabel({}, [{ current_interval_total_count: 4500 }]), "Plus");
+  assert.equal(__testing.getMiniMaxPlanLabel({}, [{ current_interval_total_count: 15000 }]), "Max");
   assert.equal(
     __testing.getAntigravityPlanLabel({
       currentTier: { id: "google_one_ai_pro" },

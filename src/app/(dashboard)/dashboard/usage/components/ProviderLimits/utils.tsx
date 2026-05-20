@@ -503,6 +503,10 @@ export function normalizePlanTier(plan) {
     return { key: "pro", label: "Pro", variant: "success", rank: 3, raw };
   }
 
+  if (upper.includes("STARTER")) {
+    return { key: "lite", label: "Starter", variant: "primary", rank: 2, raw };
+  }
+
   if (upper.includes("LITE") || upper.includes("LIGHT")) {
     return { key: "lite", label: "Lite", variant: "primary", rank: 2, raw };
   }

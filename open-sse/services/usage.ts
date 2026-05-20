@@ -268,14 +268,9 @@ function mapCodeAssistSubscriptionToPlanLabel(subscriptionInfo: unknown): string
   const subscription = toRecord(subscriptionInfo);
   if (Object.keys(subscription).length === 0) return "Free";
 
-  const tierId = extractCodeAssistTierId(subscription);
-  if (tierId) {
-    const mapped = mapCodeAssistTierIdToLabel(tierId);
-    if (mapped) return mapped;
-  }
-
+  const currentTier = toRecord(subscription.currentTier);
   const tierName = String(
-    getFieldValue(toRecord(subscription.currentTier), "name", "displayName") ||
+    getFieldValue(currentTier, "name", "displayName") ||
       subscription.subscriptionType ||
       subscription.tier ||
       ""
@@ -292,7 +287,13 @@ function mapCodeAssistSubscriptionToPlanLabel(subscriptionInfo: unknown): string
   if (upper.includes("LITE")) return "Lite";
   if (upper.includes("INDIVIDUAL") || upper.includes("FREE")) return "Free";
 
-  if (toRecord(subscription.currentTier).upgradeSubscriptionType) return "Free";
+  const tierId = extractCodeAssistTierId(subscription);
+  if (tierId) {
+    const mapped = mapCodeAssistTierIdToLabel(tierId);
+    if (mapped) return mapped;
+  }
+
+  if (currentTier.upgradeSubscriptionType) return "Free";
 
   if (tierName) {
     return tierName.charAt(0).toUpperCase() + tierName.slice(1).toLowerCase();
@@ -301,7 +302,19 @@ function mapCodeAssistSubscriptionToPlanLabel(subscriptionInfo: unknown): string
   return "Free";
 }
 
-function getMiniMaxPlanLabel(payload: JsonRecord): string {
+function inferMiniMaxPlanLabelFromTotals(models: JsonRecord[]): string | null {
+  const maxSessionTotal = models.reduce(
+    (maxTotal, model) => Math.max(maxTotal, getMiniMaxSessionTotal(model)),
+    0
+  );
+
+  if (maxSessionTotal >= 15_000) return "Max";
+  if (maxSessionTotal >= 4_500) return "Plus";
+  if (maxSessionTotal >= 1_500) return "Starter";
+  return null;
+}
+
+function getMiniMaxPlanLabel(payload: JsonRecord, models: JsonRecord[] = []): string {
   const raw = pickFirstNonEmptyString(
     getFieldValue(payload, "current_subscribe_title", "currentSubscribeTitle"),
     getFieldValue(payload, "plan_name", "planName"),
@@ -310,7 +323,7 @@ function getMiniMaxPlanLabel(payload: JsonRecord): string {
     getFieldValue(payload, "combo_title", "comboTitle")
   );
 
-  if (!raw) return "Coding Plan";
+  if (!raw) return inferMiniMaxPlanLabelFromTotals(models) || "Coding Plan";
 
   const cleaned = raw
     .replace(/^minimax\s+/i, "")
@@ -318,7 +331,7 @@ function getMiniMaxPlanLabel(payload: JsonRecord): string {
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  return cleaned || "Coding Plan";
+  return cleaned || inferMiniMaxPlanLabelFromTotals(models) || "Coding Plan";
 }
 
 function getClaudePlanLabel(...candidates: Array<string | null | undefined>): string | null {
@@ -585,7 +598,7 @@ async function getMiniMaxUsage(apiKey: string, provider: "minimax" | "minimax-cn
         return { message: "MiniMax connected. Unable to extract text quota usage." };
       }
 
-      return { plan: getMiniMaxPlanLabel(payload), quotas };
+      return { plan: getMiniMaxPlanLabel(payload, textModels), quotas };
     } catch (error) {
       lastErrorMessage = (error as Error).message;
       if (!canFallback) {
@@ -1936,7 +1949,15 @@ async function getAntigravityUsage(
       subscriptionInfo,
     };
   } catch (error) {
-    return { message: `Antigravity error: ${(error as Error).message}` };
+    const subscriptionInfo = await getAntigravitySubscriptionInfoCached(
+      accessToken,
+      providerSpecificData
+    );
+    return {
+      plan: getAntigravityPlanLabel(subscriptionInfo),
+      message: `Antigravity error: ${(error as Error).message}`,
+      subscriptionInfo,
+    };
   }
 }
 
@@ -2573,4 +2594,6 @@ export const __testing = {
   inferGitHubPlanName,
   getGeminiCliPlanLabel,
   getAntigravityPlanLabel,
+  getMiniMaxPlanLabel,
+  inferMiniMaxPlanLabelFromTotals,
 };
