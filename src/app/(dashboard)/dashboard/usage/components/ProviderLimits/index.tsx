@@ -25,7 +25,6 @@ import { translateUsageOrFallback, type UsageTranslationValues } from "./i18nFal
 const LS_EXPANDED_ROWS = "omniroute:limits:expandedRows";
 const LS_PURCHASE_FILTER = "omniroute:limits:purchaseFilter";
 const LS_STATUS_FILTER = "omniroute:limits:statusFilter";
-const LS_EXPANDED_PROVIDER_GROUPS = "omniroute:limits:expandedProviderGroups";
 const LS_ENV_FILTER = "omniroute:limits:envFilter";
 
 const MIN_FETCH_INTERVAL_MS = 30000;
@@ -202,15 +201,7 @@ export default function ProviderLimits() {
       return new Set();
     }
   });
-  const [expandedProviderGroups, setExpandedProviderGroups] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try {
-      const saved = localStorage.getItem(LS_EXPANDED_PROVIDER_GROUPS);
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
+
   const [purchaseTypeFilter, setPurchaseTypeFilter] = useState<PurchaseTypeKey>(() => {
     if (typeof window === "undefined") return "all";
     const saved = localStorage.getItem(LS_PURCHASE_FILTER) as PurchaseTypeKey | null;
@@ -641,36 +632,6 @@ export default function ProviderLimits() {
     );
   }, [visibleConnections]);
 
-  // First-render: expand every visible provider group so the page is not
-  // a wall of collapsed headers. We only do this when the user has no saved
-  // state — once they collapse a group, the choice sticks.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (providerGroups.size === 0) return;
-    const hasSaved = localStorage.getItem(LS_EXPANDED_PROVIDER_GROUPS) !== null;
-    if (hasSaved) return;
-    const allKeys = new Set([...providerGroups.keys()]);
-    setExpandedProviderGroups(allKeys);
-    try {
-      localStorage.setItem(LS_EXPANDED_PROVIDER_GROUPS, JSON.stringify([...allKeys]));
-    } catch {
-      /* localStorage may be unavailable; persistence is best-effort */
-    }
-  }, [providerGroups]);
-
-  const toggleProviderGroup = useCallback((providerKey: string) => {
-    setExpandedProviderGroups((prev) => {
-      const next = new Set(prev);
-      next.has(providerKey) ? next.delete(providerKey) : next.add(providerKey);
-      try {
-        localStorage.setItem(LS_EXPANDED_PROVIDER_GROUPS, JSON.stringify([...next]));
-      } catch {
-        /* localStorage may be unavailable; persistence is best-effort */
-      }
-      return next;
-    });
-  }, []);
-
   const toggleRow = useCallback((connectionId: string) => {
     setExpandedRows((prev) => {
       const next = new Set(prev);
@@ -920,23 +881,15 @@ export default function ProviderLimits() {
           const allQuotas = conns.flatMap((c) => quotaData[c.id]?.quotas || []);
           const groupSchema = getProviderColumns(providerKey, allQuotas);
           const grid = buildGridTemplate(groupSchema.columns.length);
-
-          const groupExpanded = expandedProviderGroups.has(providerKey);
-          const worst = aggregateWorst(conns.map((c) => statusByConnection[c.id] || "empty"));
           const accountIds = conns.map((c) => c.id);
 
           return (
             <ProviderGroup
               key={providerKey}
               providerKey={providerKey}
-              providerLabel={PROVIDER_LABEL[providerKey] || providerKey}
-              accountCount={conns.length}
-              worstStatus={worst}
               columns={groupSchema.columns}
               overflowMax={groupSchema.overflowCount}
-              isExpanded={groupExpanded}
               isRefreshing={refreshingGroups.has(providerKey)}
-              onToggle={() => toggleProviderGroup(providerKey)}
               onRefreshGroup={() => refreshProviderGroup(providerKey, accountIds)}
             >
               {conns.map((conn, idx) => {
@@ -953,6 +906,7 @@ export default function ProviderLimits() {
                   <AccountRow
                     key={conn.id}
                     connection={conn}
+                    providerLabel={PROVIDER_LABEL[providerKey] || providerKey}
                     quota={quotaData[conn.id]}
                     loading={!!loading[conn.id]}
                     error={errors[conn.id] || null}

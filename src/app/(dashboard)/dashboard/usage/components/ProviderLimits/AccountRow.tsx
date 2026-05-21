@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import Badge from "@/shared/components/Badge";
+import ProviderIcon from "@/shared/components/ProviderIcon";
 import { pickDisplayValue } from "@/shared/utils/maskEmail";
 import { calculatePercentage, formatQuotaLabel } from "./utils";
 import { translateUsageOrFallback, type UsageTranslationValues } from "./i18nFallback";
@@ -10,7 +11,7 @@ import type { ResolvedColumn } from "./providerColumns";
 /**
  * One row inside a ProviderGroup table.
  *
- * Collapsed view: account identity + tier badge + one cell per resolved
+ * Collapsed view: provider identity + account identity + tier badge + one cell per resolved
  * column + overflow count + cutoff/refresh actions.
  *
  * Expanded panel (`isExpanded`): full quota detail with progress bars,
@@ -24,6 +25,7 @@ import type { ResolvedColumn } from "./providerColumns";
  */
 interface AccountRowProps {
   connection: any;
+  providerLabel: string;
   quota: { quotas?: any[]; plan?: string | null; message?: string | null; stale?: any } | undefined;
   loading: boolean;
   error: string | null;
@@ -97,6 +99,7 @@ function formatCountdown(resetAt: string | null | undefined): string | null {
 
 export default function AccountRow({
   connection,
+  providerLabel,
   quota,
   loading,
   error,
@@ -349,6 +352,19 @@ export default function AccountRow({
         }}
         aria-expanded={isExpanded}
       >
+        {/* Provider identity */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-5 h-5 rounded flex items-center justify-center overflow-hidden shrink-0">
+            <ProviderIcon
+              providerId={connection.provider}
+              size={18}
+              type="color"
+              className="object-contain"
+            />
+          </div>
+          <span className="text-[12px] font-semibold text-text-main truncate">{providerLabel}</span>
+        </div>
+
         {/* Account identity */}
         <div className="flex items-center gap-2 min-w-0">
           <span className="material-symbols-outlined text-[16px] text-text-muted shrink-0">
