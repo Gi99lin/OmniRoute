@@ -2094,8 +2094,22 @@ async function getAntigravitySubscriptionInfo(
   accessToken: string,
   providerSpecificData?: JsonRecord
 ): Promise<unknown | null> {
+  const profile = getAntigravityClientProfile({ providerSpecificData });
+  const logLoadCodeAssistDebug = (payload: JsonRecord) => {
+    if (process.env.OMNIROUTE_DEBUG_ANTIGRAVITY_TIER !== "1") return;
+    console.log(
+      "[DEBUG-antigravity-loadCodeAssist]",
+      JSON.stringify({
+        profile,
+        endpoint: ANTIGRAVITY_CONFIG.loadProjectApiUrl,
+        providerClientProfile: providerSpecificData?.clientProfile ?? null,
+        providerProjectId: providerSpecificData?.projectId ?? null,
+        ...payload,
+      })
+    );
+  };
+
   try {
-    const profile = getAntigravityClientProfile({ providerSpecificData });
     const response = await fetch(ANTIGRAVITY_CONFIG.loadProjectApiUrl, {
       method: "POST",
       headers:
@@ -2105,10 +2119,30 @@ async function getAntigravitySubscriptionInfo(
       body: JSON.stringify({ metadata: getAntigravityLoadCodeAssistMetadata() }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      logLoadCodeAssistDebug({
+        ok: false,
+        status: response.status,
+        statusText: response.statusText,
+      });
+      return null;
+    }
 
-    return await response.json();
-  } catch {
+    const data = await response.json();
+    const dataRecord = toRecord(data);
+    logLoadCodeAssistDebug({
+      ok: true,
+      status: response.status,
+      topLevelKeys: Object.keys(dataRecord),
+      currentTier: dataRecord.currentTier ?? null,
+      allowedTiers: Array.isArray(dataRecord.allowedTiers) ? dataRecord.allowedTiers : null,
+      subscriptionType: dataRecord.subscriptionType ?? null,
+      tier: dataRecord.tier ?? null,
+      cloudaicompanionProject: dataRecord.cloudaicompanionProject ?? null,
+    });
+    return data;
+  } catch (error) {
+    logLoadCodeAssistDebug({ ok: false, errorMessage: (error as Error).message });
     return null;
   }
 }
