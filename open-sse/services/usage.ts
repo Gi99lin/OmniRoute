@@ -1696,8 +1696,12 @@ async function fetchAntigravityAvailableModelsCached(
  * Extracts tier from allowedTiers[].isDefault (same logic as providers.js postExchange).
  * Falls back to currentTier.id → currentTier.name → "Free".
  */
-function getAntigravityPlanLabel(subscriptionInfo: unknown): string {
-  return mapCodeAssistSubscriptionToPlanLabel(subscriptionInfo);
+function getAntigravityPlanLabel(subscriptionInfo: unknown, fallbackInfo?: unknown): string {
+  const plan = mapCodeAssistSubscriptionToPlanLabel(subscriptionInfo);
+  if (plan !== "Free") return plan;
+
+  const fallbackPlan = mapCodeAssistSubscriptionToPlanLabel(fallbackInfo);
+  return fallbackPlan !== "Free" ? fallbackPlan : plan;
 }
 
 /**
@@ -1868,7 +1872,10 @@ async function getAntigravityUsage(
       providerSpecificData
     );
     const projectId =
-      connectionProjectId || toRecord(subscriptionInfo).cloudaicompanionProject?.toString() || null;
+      connectionProjectId ||
+      providerSpecificData?.projectId?.toString() ||
+      toRecord(subscriptionInfo).cloudaicompanionProject?.toString() ||
+      null;
 
     // Derive accountId for credit balance cache.
     // Must match executor key: credentials.connectionId
@@ -1933,7 +1940,7 @@ async function getAntigravityUsage(
     }
 
     return {
-      plan: getAntigravityPlanLabel(subscriptionInfo),
+      plan: getAntigravityPlanLabel(subscriptionInfo, providerSpecificData),
       quotas: {
         ...quotas,
         ...(creditBalance !== null && {
@@ -1954,7 +1961,7 @@ async function getAntigravityUsage(
       providerSpecificData
     );
     return {
-      plan: getAntigravityPlanLabel(subscriptionInfo),
+      plan: getAntigravityPlanLabel(subscriptionInfo, providerSpecificData),
       message: `Antigravity error: ${(error as Error).message}`,
       subscriptionInfo,
     };

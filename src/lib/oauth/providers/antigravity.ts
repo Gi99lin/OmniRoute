@@ -69,7 +69,11 @@ export const antigravity = {
       if (loadRes.ok) {
         const data = await loadRes.json();
         projectId = data.cloudaicompanionProject?.id || data.cloudaicompanionProject || "";
-        if (Array.isArray(data.allowedTiers)) {
+        const currentTierId =
+          typeof data.currentTier?.id === "string" ? data.currentTier.id.trim() : "";
+        if (currentTierId) {
+          tierId = currentTierId;
+        } else if (Array.isArray(data.allowedTiers)) {
           for (const tier of data.allowedTiers) {
             if (tier.isDefault && tier.id) {
               tierId = tier.id.trim();

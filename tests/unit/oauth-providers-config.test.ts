@@ -438,10 +438,15 @@ test("Gemini and Antigravity run mocked browser OAuth exchanges and post-exchang
       assert.match(init.headers["User-Agent"], /^vscode\/1\.X\.X \(Antigravity\//);
       assert.equal(init.headers["X-Goog-Api-Client"], undefined);
       assert.equal(init.headers["Client-Metadata"], undefined);
-      assert.deepEqual(JSON.parse(String(init.body)).metadata, { ideType: "ANTIGRAVITY" });
+      assert.deepEqual(JSON.parse(String(init.body)).metadata, {
+        ideType: "ANTIGRAVITY",
+        platform: "MACOS",
+        pluginType: "GEMINI",
+      });
       return jsonResponse({
         cloudaicompanionProject: { id: "anti-project" },
-        allowedTiers: [{ id: "tier-default", isDefault: true }],
+        currentTier: { id: "tier_google_one_ai_pro" },
+        allowedTiers: [{ id: "free-tier", isDefault: true }],
       });
     },
     (_url, init = {}) => {
@@ -449,7 +454,11 @@ test("Gemini and Antigravity run mocked browser OAuth exchanges and post-exchang
       assert.equal(init.headers.Authorization, "Bearer anti-access");
       assert.match(init.headers["User-Agent"], /^vscode\/1\.X\.X \(Antigravity\//);
       assert.equal(init.headers["X-Goog-Api-Client"], undefined);
-      assert.deepEqual(JSON.parse(String(init.body)).metadata, { ideType: "ANTIGRAVITY" });
+      assert.deepEqual(JSON.parse(String(init.body)).metadata, {
+        ideType: "ANTIGRAVITY",
+        platform: "MACOS",
+        pluginType: "GEMINI",
+      });
       return jsonResponse({
         done: true,
         response: { cloudaicompanionProject: { id: "anti-project-final" } },
@@ -477,6 +486,7 @@ test("Gemini and Antigravity run mocked browser OAuth exchanges and post-exchang
   assert.equal(geminiMapped.projectId, "gemini-project");
   assert.equal(antigravityMapped.email, "anti@example.com");
   assert.equal(antigravityMapped.projectId, "anti-project-final");
+  assert.equal(antigravityMapped.providerSpecificData.tier, "tier_google_one_ai_pro");
 });
 
 test("Qoder enabled mode exchanges tokens and loads profile metadata through mocked endpoints", async () => {

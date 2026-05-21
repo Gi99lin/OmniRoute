@@ -409,8 +409,8 @@ export function parseQuotaData(provider, data) {
  */
 export function resolvePlanValue(plan, providerSpecificData) {
   const psd = toRecord(providerSpecificData);
-  const candidates = [
-    plan,
+  const livePlan = normalizePlanCandidate(plan);
+  const persistedCandidates = [
     psd.workspacePlanType,
     psd.plan,
     psd.subscription,
@@ -422,12 +422,16 @@ export function resolvePlanValue(plan, providerSpecificData) {
     psd.organizationType,
   ];
 
-  for (const candidate of candidates) {
+  if (livePlan && normalizePlanTier(livePlan).key !== "free") {
+    return livePlan;
+  }
+
+  for (const candidate of persistedCandidates) {
     const normalized = normalizePlanCandidate(candidate);
     if (normalized) return normalized;
   }
 
-  return null;
+  return livePlan || null;
 }
 
 /**

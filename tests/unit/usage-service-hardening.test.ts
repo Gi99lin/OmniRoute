@@ -502,6 +502,25 @@ test("usage service preserves Antigravity plan when model quotas fail", async ()
   assert.match(failedUsage.message, /Antigravity error: Antigravity API error: 500/i);
 });
 
+test("usage service falls back to saved Antigravity tier when subscription lookup is empty", async () => {
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("loadCodeAssist")) {
+      return new Response("not found", { status: 404 });
+    }
+    return new Response("upstream failed", { status: 500 });
+  };
+
+  const usage: any = await usageService.getUsageForProvider({
+    provider: "antigravity",
+    accessToken: "ag-saved-tier",
+    providerSpecificData: { tier: "tier_google_one_ai_pro", projectId: "ag-project" },
+  });
+
+  assert.equal(usage.plan, "Pro");
+  assert.equal(usage.subscriptionInfo, null);
+  assert.match(usage.message, /Antigravity error/i);
+});
+
 test("usage service covers Claude OAuth success, legacy fallback and permissions message", async () => {
   globalThis.fetch = async (url) => {
     if (String(url).includes("/api/oauth/usage")) {
@@ -1285,6 +1304,12 @@ test("usage helper branches cover Gemini CLI and Antigravity plan label fallback
   );
   assert.equal(
     __testing.getAntigravityPlanLabel({
+      tier: "tier_google_one_ai_pro",
+    }),
+    "Pro"
+  );
+  assert.equal(
+    __testing.getAntigravityPlanLabel(null, {
       tier: "tier_google_one_ai_pro",
     }),
     "Pro"
