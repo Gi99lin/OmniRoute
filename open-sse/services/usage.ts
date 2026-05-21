@@ -1965,7 +1965,8 @@ async function getAntigravityUsage(
   try {
     const subscriptionInfo = await getAntigravitySubscriptionInfoCached(
       accessToken,
-      providerSpecificData
+      providerSpecificData,
+      options
     );
     const savedProjectId =
       typeof providerSpecificData?.projectId === "string" && providerSpecificData.projectId.trim()
@@ -2071,7 +2072,8 @@ async function getAntigravityUsage(
     try {
       subscriptionInfo = await getAntigravitySubscriptionInfoCached(
         accessToken,
-        providerSpecificData
+        providerSpecificData,
+        options
       );
     } catch {
       subscriptionInfo = null;
@@ -2096,18 +2098,25 @@ async function getAntigravityUsage(
  */
 async function getAntigravitySubscriptionInfoCached(
   accessToken: string,
-  providerSpecificData?: JsonRecord
+  providerSpecificData?: JsonRecord,
+  options: AntigravityUsageOptions = {}
 ): Promise<unknown> {
   const profile = getAntigravityClientProfile({ providerSpecificData });
   const cacheKey = `${accessToken.substring(0, 16)}:${profile}`;
-  const cached = _antigravitySubCache.get(cacheKey);
 
-  if (cached && Date.now() - cached.fetchedAt < ANTIGRAVITY_CACHE_TTL_MS) {
-    return cached.data;
+  if (options.forceRefresh) {
+    _antigravitySubCache.delete(cacheKey);
+  } else {
+    const cached = _antigravitySubCache.get(cacheKey);
+    if (cached && Date.now() - cached.fetchedAt < ANTIGRAVITY_CACHE_TTL_MS) {
+      return cached.data;
+    }
   }
 
   const data = await getAntigravitySubscriptionInfo(accessToken, providerSpecificData);
-  _antigravitySubCache.set(cacheKey, { data, fetchedAt: Date.now() });
+  if (data != null) {
+    _antigravitySubCache.set(cacheKey, { data, fetchedAt: Date.now() });
+  }
   return data;
 }
 

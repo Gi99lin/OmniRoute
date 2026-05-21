@@ -413,10 +413,12 @@ test("usage service manual Antigravity refresh bypasses usage TTL caches", async
   process.env.ANTIGRAVITY_CREDITS = "retry";
   let probeCalls = 0;
   let modelCalls = 0;
+  let loadCodeAssistCalls = 0;
 
   globalThis.fetch = async (url) => {
     const urlStr = String(url);
     if (urlStr.includes("loadCodeAssist")) {
+      loadCodeAssistCalls++;
       return new Response(JSON.stringify({ cloudaicompanionProject: "ag-project" }), {
         status: 200,
       });
@@ -459,6 +461,7 @@ test("usage service manual Antigravity refresh bypasses usage TTL caches", async
 
   assert.equal(probeCalls, 2);
   assert.equal(modelCalls, 2);
+  assert.equal(loadCodeAssistCalls, 2);
 });
 
 test("usage service handles missing Antigravity access tokens without probing upstream", async () => {

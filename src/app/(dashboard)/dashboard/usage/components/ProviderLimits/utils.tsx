@@ -413,6 +413,7 @@ export function resolvePlanValue(plan, providerSpecificData) {
   const persistedCandidates = [
     psd.workspacePlanType,
     psd.plan,
+    psd.subscriptionTier,
     psd.subscription,
     psd.tier,
     psd.accountTier,
