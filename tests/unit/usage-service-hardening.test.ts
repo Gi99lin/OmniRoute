@@ -400,12 +400,11 @@ test("usage service retries Antigravity fetchAvailableModels across the shared f
   assert.deepEqual(
     quotaCalls.map((call) => call.url),
     [
-      "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:fetchAvailableModels",
       "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
       "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
     ]
   );
-  assert.match(quotaCalls[2].init.headers["User-Agent"], /^Antigravity\//);
+  assert.match(quotaCalls[1].init.headers["User-Agent"], /^Antigravity\//);
   assert.equal(usage.plan, "Business");
   assert.equal(usage.quotas["claude-sonnet-4-6"].used, 500);
 });
@@ -1282,6 +1281,19 @@ test("usage helper branches cover Gemini CLI and Antigravity plan label fallback
   );
 
   assert.equal(__testing.getAntigravityPlanLabel(null), "Free");
+  assert.equal(
+    __testing.getAntigravityPlanLabel({
+      currentTier: { id: "tier_google_one_ai_pro" },
+      allowedTiers: [{ id: "free-tier", isDefault: true }],
+    }),
+    "Pro"
+  );
+  assert.equal(
+    __testing.getAntigravityPlanLabel(null, {
+      tier: "tier_google_one_ai_pro",
+    }),
+    "Pro"
+  );
   assert.equal(
     __testing.getAntigravityPlanLabel({
       allowedTiers: [{ id: "tier_pro", isDefault: true }],
