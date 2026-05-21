@@ -4,6 +4,7 @@ import {
   getAntigravityHeaders,
   getAntigravityLoadCodeAssistMetadata,
 } from "@omniroute/open-sse/services/antigravityHeaders.ts";
+import { extractCodeAssistOnboardTierId } from "@omniroute/open-sse/services/codeAssistSubscription.ts";
 
 async function fetchFirstOk(endpoints: string[], init: RequestInit) {
   let lastError: unknown = null;
@@ -82,16 +83,7 @@ export const antigravity = {
       });
       const data = await loadRes.json();
       projectId = data.cloudaicompanionProject?.id || data.cloudaicompanionProject || "";
-      if (typeof data.currentTier?.id === "string" && data.currentTier.id.trim()) {
-        tierId = data.currentTier.id.trim();
-      } else if (Array.isArray(data.allowedTiers)) {
-        for (const tier of data.allowedTiers) {
-          if (tier.isDefault && tier.id) {
-            tierId = tier.id.trim();
-            break;
-          }
-        }
-      }
+      tierId = extractCodeAssistOnboardTierId(data);
     } catch (e) {
       console.log("Failed to load code assist:", e);
     }

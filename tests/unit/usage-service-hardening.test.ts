@@ -1356,6 +1356,45 @@ test("usage helper branches cover Gemini CLI and Antigravity plan label fallback
     }),
     "Custom sky"
   );
+
+  assert.equal(
+    __testing.extractCodeAssistSubscriptionTier({
+      paidTier: { name: "Google One AI Premium" },
+      currentTier: { id: "free-tier" },
+    }),
+    "Google One AI Premium"
+  );
+  assert.equal(
+    __testing.getAntigravityPlanLabel({
+      paidTier: { name: "Google One AI Premium" },
+      currentTier: { id: "free-tier" },
+    }),
+    "Pro"
+  );
+  assert.equal(
+    __testing.extractCodeAssistOnboardTierId({
+      paidTier: { id: "tier_google_one_ai_pro" },
+      currentTier: { id: "free-tier" },
+      allowedTiers: [{ id: "free-tier", isDefault: true }],
+    }),
+    "tier_google_one_ai_pro"
+  );
+  assert.equal(
+    __testing.extractCodeAssistSubscriptionTier({
+      ineligibleTiers: [{ reasonCode: "REGION" }],
+      allowedTiers: [{ id: "tier_pro", name: "Pro", isDefault: true }],
+      currentTier: { id: "tier_ultra" },
+    }),
+    "Pro (Restricted)"
+  );
+  assert.equal(
+    __testing.getAntigravityPlanLabel({
+      ineligibleTiers: [{ reasonCode: "REGION" }],
+      allowedTiers: [{ id: "tier_pro", name: "Pro", isDefault: true }],
+      currentTier: { id: "tier_ultra" },
+    }),
+    "Pro"
+  );
 });
 
 test("usage service covers NanoGPT PRO weekly token quota, FREE plan, auth denial and fetch failures", async () => {

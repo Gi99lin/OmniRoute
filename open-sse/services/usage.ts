@@ -38,6 +38,10 @@ import {
 import { getCreditsMode } from "./antigravityCredits.ts";
 import { CLAUDE_CODE_VERSION, fetchClaudeBootstrap } from "../executors/claudeIdentity.ts";
 import { generateAntigravityRequestId, getAntigravitySessionId } from "./antigravityIdentity.ts";
+import {
+  extractCodeAssistOnboardTierId,
+  extractCodeAssistSubscriptionTier,
+} from "./codeAssistSubscription.ts";
 
 // Antigravity API config (credentials from PROVIDERS via credential loader)
 const ANTIGRAVITY_CONFIG = {
@@ -271,16 +275,11 @@ function getClaudePlanLabel(...candidates: Array<string | null | undefined>): st
 }
 
 function extractCodeAssistTierId(subscription: JsonRecord): string {
-  const currentTier = toRecord(subscription.currentTier);
-  const currentId = typeof currentTier.id === "string" ? currentTier.id.trim().toUpperCase() : "";
-  if (currentId && mapCodeAssistTierIdToLabel(currentId)) return currentId;
-  if (Array.isArray(subscription.allowedTiers)) {
-    for (const tierValue of subscription.allowedTiers) {
-      const tier = toRecord(tierValue);
-      if (tier.isDefault && typeof tier.id === "string") return tier.id.trim().toUpperCase();
-    }
-  }
-  return currentId;
+  const tierId = extractCodeAssistOnboardTierId(subscription);
+  if (tierId === "legacy-tier") return "";
+  const upper = tierId.toUpperCase();
+  if (mapCodeAssistTierIdToLabel(upper)) return upper;
+  return upper;
 }
 
 function mapCodeAssistTierIdToLabel(tierId: string): string | null {
@@ -302,17 +301,8 @@ function mapCodeAssistTierIdToLabel(tierId: string): string | null {
   return null;
 }
 
-function mapCodeAssistSubscriptionToPlanLabel(subscriptionInfo: unknown): string {
-  const subscription = toRecord(subscriptionInfo);
-  if (Object.keys(subscription).length === 0) return "Free";
-  const currentTier = toRecord(subscription.currentTier);
-  const tierName = String(
-    getFieldValue(currentTier, "name", "displayName") ||
-      subscription.subscriptionType ||
-      subscription.tier ||
-      ""
-  );
-  const upper = tierName.toUpperCase();
+function mapSubscriptionTierStringToPlanLabel(tierText: string): string | null {
+  const upper = tierText.toUpperCase();
   if (upper.includes("ULTRA")) return "Ultra";
   if (upper.includes("PRO") || upper.includes("PREMIUM") || upper.includes("GOOGLE ONE"))
     return "Pro";
@@ -321,6 +311,37 @@ function mapCodeAssistSubscriptionToPlanLabel(subscriptionInfo: unknown): string
   if (upper.includes("PLUS")) return "Plus";
   if (upper.includes("LITE")) return "Lite";
   if (upper.includes("INDIVIDUAL") || upper.includes("FREE")) return "Free";
+  const normalizedId = upper.replace(/\s*\(RESTRICTED\)\s*$/i, "").trim();
+  if (normalizedId) {
+    const mapped = mapCodeAssistTierIdToLabel(normalizedId);
+    if (mapped) return mapped;
+  }
+  return null;
+}
+
+function mapCodeAssistSubscriptionToPlanLabel(subscriptionInfo: unknown): string {
+  const subscription = toRecord(subscriptionInfo);
+  if (Object.keys(subscription).length === 0) return "Free";
+
+  const subscriptionTier = extractCodeAssistSubscriptionTier(subscriptionInfo);
+  if (subscriptionTier) {
+    const mapped = mapSubscriptionTierStringToPlanLabel(subscriptionTier);
+    if (mapped) return mapped;
+    if (subscriptionTier.toLowerCase() !== "free") {
+      return subscriptionTier.charAt(0).toUpperCase() + subscriptionTier.slice(1).toLowerCase();
+    }
+  }
+
+  const currentTier = toRecord(subscription.currentTier);
+  const tierName = String(
+    getFieldValue(currentTier, "name", "displayName") ||
+      subscription.subscriptionType ||
+      subscription.tier ||
+      ""
+  );
+  const mappedName = tierName ? mapSubscriptionTierStringToPlanLabel(tierName) : null;
+  if (mappedName) return mappedName;
+
   const tierId = extractCodeAssistTierId(subscription);
   if (tierId) {
     const mapped = mapCodeAssistTierIdToLabel(tierId);
@@ -1701,6 +1722,10 @@ function logAntigravityTierDebug(
       stage,
       resolvedPlan,
       currentTier: subscription.currentTier ?? null,
+      paidTier: subscription.paidTier ?? null,
+      ineligibleTiers: Array.isArray(subscription.ineligibleTiers)
+        ? subscription.ineligibleTiers
+        : null,
       allowedTiers: Array.isArray(subscription.allowedTiers) ? subscription.allowedTiers : null,
       subscriptionType: subscription.subscriptionType ?? null,
       tier: subscription.tier ?? null,
@@ -2135,6 +2160,10 @@ async function getAntigravitySubscriptionInfo(
       status: response.status,
       topLevelKeys: Object.keys(dataRecord),
       currentTier: dataRecord.currentTier ?? null,
+      paidTier: dataRecord.paidTier ?? null,
+      ineligibleTiers: Array.isArray(dataRecord.ineligibleTiers)
+        ? dataRecord.ineligibleTiers
+        : null,
       allowedTiers: Array.isArray(dataRecord.allowedTiers) ? dataRecord.allowedTiers : null,
       subscriptionType: dataRecord.subscriptionType ?? null,
       tier: dataRecord.tier ?? null,
@@ -2734,4 +2763,6 @@ export const __testing = {
   getAntigravityPlanLabel,
   getMiniMaxPlanLabel,
   inferMiniMaxPlanLabelFromTotals,
+  extractCodeAssistSubscriptionTier,
+  extractCodeAssistOnboardTierId,
 };
