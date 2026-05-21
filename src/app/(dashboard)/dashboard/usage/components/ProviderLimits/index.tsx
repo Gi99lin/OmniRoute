@@ -882,11 +882,17 @@ export default function ProviderLimits() {
           const groupSchema = getProviderColumns(providerKey, allQuotas);
           const grid = buildGridTemplate(groupSchema.columns.length);
           const accountIds = conns.map((c) => c.id);
+          const worstGroupStatus = aggregateWorst(
+            conns.map((c) => statusByConnection[c.id] || "empty")
+          );
 
           return (
             <ProviderGroup
               key={providerKey}
               providerKey={providerKey}
+              providerLabel={PROVIDER_LABEL[providerKey] || providerKey}
+              accountCount={conns.length}
+              worstStatus={worstGroupStatus}
               columns={groupSchema.columns}
               overflowMax={groupSchema.overflowCount}
               isRefreshing={refreshingGroups.has(providerKey)}
@@ -906,7 +912,6 @@ export default function ProviderLimits() {
                   <AccountRow
                     key={conn.id}
                     connection={conn}
-                    providerLabel={PROVIDER_LABEL[providerKey] || providerKey}
                     quota={quotaData[conn.id]}
                     loading={!!loading[conn.id]}
                     error={errors[conn.id] || null}
