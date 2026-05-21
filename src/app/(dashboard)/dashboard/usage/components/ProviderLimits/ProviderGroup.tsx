@@ -45,14 +45,19 @@ const STATUS_DOT: Record<"critical" | "alert" | "ok" | "empty", string> = {
  *   identity | tier | quota-columns... | overflow | cutoff | refresh
  *
  * Provider lives in the rail (outside this grid), so it has no column here.
+ *
+ * Identity, tier, overflow, cutoff and refresh are *fixed* widths so the
+ * tier column visually aligns across providers regardless of how many
+ * quota columns the group has. Quota columns share the remaining width
+ * via `1fr` so progress bars stretch to fill their column.
  */
 export function buildGridTemplate(columnCount: number): string {
-  const identityWidth = columnCount <= 1 ? "minmax(220px, 2.4fr)" : "minmax(180px, 2fr)";
-  const tierWidth = "minmax(64px, 80px)";
+  const identityWidth = "minmax(220px, 240px)";
+  const tierWidth = "84px";
   const columnsTpl =
-    columnCount > 0 ? Array(columnCount).fill("minmax(76px, 1fr)").join(" ") : "minmax(120px, 1fr)";
-  const overflowWidth = "36px";
-  const cutoffWidth = "minmax(76px, 96px)";
+    columnCount > 0 ? Array(columnCount).fill("minmax(80px, 1fr)").join(" ") : "minmax(120px, 1fr)";
+  const overflowWidth = "32px";
+  const cutoffWidth = "92px";
   const refreshWidth = "32px";
   return [identityWidth, tierWidth, columnsTpl, overflowWidth, cutoffWidth, refreshWidth].join(" ");
 }
@@ -103,7 +108,7 @@ export default function ProviderGroup({
             title={tr(`statusDot_${worstStatus}`, worstStatus)}
           />
           <span className="text-[10px] text-text-muted tabular-nums">
-            {tr("groupAccountsCount", "{count} accounts", { count: accountCount })}
+            {tr("groupAccountsCount", `${accountCount} accounts`, { count: accountCount })}
           </span>
         </div>
         <button

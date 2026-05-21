@@ -238,7 +238,7 @@ export default function AccountRow({
           </span>
         )}
         {!q.unlimited && (
-          <div className="h-1 w-6 rounded-full bg-black/[0.06] dark:bg-white/[0.06] overflow-hidden shrink-0">
+          <div className="h-1 flex-1 min-w-[20px] rounded-full bg-black/[0.06] dark:bg-white/[0.06] overflow-hidden">
             <div
               className="h-full rounded-full transition-[width] duration-300 ease-out"
               style={{
@@ -548,7 +548,9 @@ export default function AccountRow({
                   >
                     {showUnused
                       ? tr("hideUnusedQuotas", "Hide untouched")
-                      : tr("showUnusedQuotas", "Show {count} untouched", { count: untouchedCount })}
+                      : tr("showUnusedQuotas", `Show ${untouchedCount} untouched`, {
+                          count: untouchedCount,
+                        })}
                   </button>
                 ) : (
                   <span />
