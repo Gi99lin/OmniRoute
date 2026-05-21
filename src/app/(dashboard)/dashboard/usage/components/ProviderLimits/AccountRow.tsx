@@ -189,29 +189,34 @@ export default function AccountRow({
       : `${col.label} — ${pct}% ${tr("remainingShort", "remaining")} (${usedNum.toLocaleString()} / ${totalNum.toLocaleString()})`;
 
     return (
-      <div key={col.key} className="flex flex-col gap-0.5 min-w-0" title={tooltip}>
-        <div className="flex items-center justify-between gap-1.5">
-          <span className="text-[12px] font-semibold tabular-nums" style={{ color: colors.text }}>
+      <div key={col.key} className="flex items-center gap-1.5 min-w-0" title={tooltip}>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <span
+            className="text-[12px] font-semibold tabular-nums leading-none"
+            style={{ color: colors.text }}
+          >
             {q.unlimited ? "∞" : `${pct}%`}
           </span>
           {q.staleAfterReset && (
             <span
-              className="material-symbols-outlined text-[12px] text-amber-500"
+              className="material-symbols-outlined text-[12px] text-amber-500 shrink-0"
               title={t("staleQuotaTooltip")}
             >
               autorenew
             </span>
           )}
         </div>
-        <div className="h-1.5 rounded-sm bg-black/[0.06] dark:bg-white/[0.06] overflow-hidden">
-          <div
-            className="h-full rounded-sm transition-[width] duration-300 ease-out"
-            style={{
-              width: `${Math.min(pct, 100)}%`,
-              background: colors.bar,
-            }}
-          />
-        </div>
+        {!q.unlimited && (
+          <div className="h-1 w-6 rounded-full bg-black/[0.06] dark:bg-white/[0.06] overflow-hidden shrink-0">
+            <div
+              className="h-full rounded-full transition-[width] duration-300 ease-out"
+              style={{
+                width: `${Math.min(pct, 100)}%`,
+                background: colors.bar,
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   };
@@ -265,38 +270,41 @@ export default function AccountRow({
     const showUsage = totalNum > 0 && !q.unlimited;
     return (
       <div key={i} className="rounded-md border border-border bg-bg/40 px-3 py-2.5">
-        <div className="flex items-center justify-between gap-3 mb-1.5">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <span
-              className="text-[12px] font-semibold py-0.5 px-2 rounded"
+              className="text-[12px] font-semibold py-0.5 px-2 rounded truncate max-w-[120px] sm:max-w-[150px] inline-block shrink-0"
               style={{ background: colors.bg, color: colors.text }}
               title={q.modelKey || q.name}
             >
               {shortName}
             </span>
             {q.unlimited && (
-              <span className="text-[10px] text-text-muted">
+              <span className="text-[10px] text-text-muted shrink-0">
                 {tr("unlimitedLabel", "Unlimited")}
               </span>
             )}
             {showUsage && (
-              <span className="text-[10px] text-text-muted tabular-nums">
+              <span className="text-[10px] text-text-muted tabular-nums shrink-0">
                 {usedNum.toLocaleString()} / {totalNum.toLocaleString()}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 min-w-0">
             {staleAfterReset ? (
-              <span className="text-[10px] text-text-muted">
+              <span className="text-[10px] text-text-muted shrink-0">
                 ⟳ {tr("refreshing", "Refreshing")}
               </span>
             ) : cd ? (
-              <span className="text-[10px] text-text-muted">
-                ⏱ {tr("resetsIn", "reset em")} {cd}
+              <span
+                className="text-[10px] text-text-muted shrink-0 truncate max-w-[85px]"
+                title={`${tr("resetsIn", "reset em")} ${cd}`}
+              >
+                ⏱ {cd}
               </span>
             ) : null}
             <span
-              className="text-[13px] font-bold tabular-nums min-w-[40px] text-right"
+              className="text-[12px] font-bold tabular-nums text-right shrink-0"
               style={{ color: colors.text }}
             >
               {pct}%
@@ -482,7 +490,7 @@ export default function AccountRow({
 
       {/* Expanded panel */}
       {isExpanded && (
-        <div className="px-12 py-3 bg-bg-subtle/30 border-t border-border space-y-2">
+        <div className="px-12 py-3.5 bg-bg-subtle/30 border-t border-border flex flex-col gap-3">
           {loading ? (
             <div className="text-xs text-text-muted flex items-center gap-1.5">
               <span className="material-symbols-outlined animate-spin text-[14px]">
@@ -497,8 +505,10 @@ export default function AccountRow({
             </div>
           ) : quota?.quotas && quota.quotas.length > 0 ? (
             <>
-              {quota.quotas.map(renderQuotaDetail)}
-              <div className="flex items-center justify-end gap-2 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {quota.quotas.map(renderQuotaDetail)}
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40 mt-1">
                 <button
                   type="button"
                   disabled={!connectionHasWindows}

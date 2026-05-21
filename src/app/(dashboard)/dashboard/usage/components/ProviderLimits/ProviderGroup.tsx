@@ -47,13 +47,13 @@ const STATUS_DOT: Record<"critical" | "alert" | "ok" | "empty", string> = {
  * width on tiny providers like MiniMax (1 column).
  */
 export function buildGridTemplate(columnCount: number): string {
-  const identityWidth = columnCount <= 1 ? "minmax(260px,1fr)" : "minmax(220px,1.5fr)";
-  const tierWidth = "minmax(72px,90px)";
+  const identityWidth = columnCount <= 1 ? "minmax(260px, 2fr)" : "minmax(220px, 2.5fr)";
+  const tierWidth = "minmax(64px, 80px)";
   const columnsTpl =
-    columnCount > 0 ? Array(columnCount).fill("minmax(90px,1fr)").join(" ") : "minmax(120px,1fr)"; // fallback so layout doesn't collapse
-  const overflowWidth = "44px";
-  const cutoffWidth = "minmax(80px,110px)";
-  const refreshWidth = "36px";
+    columnCount > 0 ? Array(columnCount).fill("minmax(68px, 1fr)").join(" ") : "minmax(120px, 1fr)"; // fallback so layout doesn't collapse
+  const overflowWidth = "36px";
+  const cutoffWidth = "minmax(76px, 96px)";
+  const refreshWidth = "32px";
   return [identityWidth, tierWidth, columnsTpl, overflowWidth, cutoffWidth, refreshWidth].join(" ");
 }
 
