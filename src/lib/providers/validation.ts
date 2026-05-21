@@ -304,7 +304,10 @@ async function validateOpenAILikeProvider({
   isLocal = false,
 }: any) {
   try {
-    const customModelsUrl = modelsUrl?.trim() || "";
+    // Guard against a non-string modelsUrl reaching .trim()/.startsWith() — a malformed
+    // providerSpecificData / registry value would otherwise throw a TypeError mid-validation
+    // ("trim is not a function" / "startsWith is not a function"). See #2463 class.
+    const customModelsUrl = (typeof modelsUrl === "string" ? modelsUrl.trim() : "") || "";
     const endpointUrl = customModelsUrl
       ? customModelsUrl.startsWith("http")
         ? customModelsUrl
@@ -754,7 +757,7 @@ async function validateGeminiLikeProvider({
 
     if (authType === "header" || authType === "apikey") {
       headers["x-goog-api-key"] = apiKey;
-    } else if (authType === "oauth" || apiKey.startsWith("ya29.")) {
+    } else if (authType === "oauth" || (typeof apiKey === "string" && apiKey.startsWith("ya29."))) {
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
@@ -1179,7 +1182,7 @@ async function validateSnowflakeProvider({ apiKey, providerSpecificData = {} }: 
     return { valid: false, error: "Missing base URL" };
   }
 
-  const usesProgrammaticAccessToken = apiKey.startsWith("pat/");
+  const usesProgrammaticAccessToken = typeof apiKey === "string" && apiKey.startsWith("pat/");
   return validateDirectChatProvider({
     url: normalizeSnowflakeChatUrl(baseUrl),
     headers: {
