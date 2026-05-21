@@ -1685,6 +1685,35 @@ function getAntigravityPlanLabel(subscriptionInfo: unknown, fallbackInfo?: unkno
   return fallbackPlan !== "Free" ? fallbackPlan : plan;
 }
 
+function logAntigravityTierDebug(
+  stage: string,
+  subscriptionInfo: unknown,
+  fallbackInfo: unknown,
+  resolvedPlan: string,
+  extra: JsonRecord = {}
+) {
+  if (process.env.OMNIROUTE_DEBUG_ANTIGRAVITY_TIER !== "1") return;
+  const subscription = toRecord(subscriptionInfo);
+  const fallback = toRecord(fallbackInfo);
+  console.log(
+    "[DEBUG-antigravity-tier]",
+    JSON.stringify({
+      stage,
+      resolvedPlan,
+      currentTier: subscription.currentTier ?? null,
+      allowedTiers: Array.isArray(subscription.allowedTiers) ? subscription.allowedTiers : null,
+      subscriptionType: subscription.subscriptionType ?? null,
+      tier: subscription.tier ?? null,
+      cloudaicompanionProject: subscription.cloudaicompanionProject ?? null,
+      fallbackTier: fallback.tier ?? null,
+      fallbackPlan: fallback.plan ?? null,
+      fallbackSubscription: fallback.subscription ?? null,
+      fallbackProjectId: fallback.projectId ?? null,
+      ...extra,
+    })
+  );
+}
+
 function getAntigravityPlanLabelLegacy(subscriptionInfo: unknown, fallbackInfo?: unknown): string {
   const subscription = toRecord(subscriptionInfo);
   if (Object.keys(subscription).length === 0) {
@@ -1989,8 +2018,15 @@ async function getAntigravityUsage(
       };
     }
 
+    const plan = getAntigravityPlanLabel(subscriptionInfo, providerSpecificData);
+    logAntigravityTierDebug("success", subscriptionInfo, providerSpecificData, plan, {
+      projectId,
+      quotaKeys: Object.keys(quotas),
+      hasCreditBalance: creditBalance !== null,
+    });
+
     return {
-      plan: getAntigravityPlanLabel(subscriptionInfo, providerSpecificData),
+      plan,
       quotas: {
         ...quotas,
         ...(creditBalance !== null && {
@@ -2016,8 +2052,13 @@ async function getAntigravityUsage(
       subscriptionInfo = null;
     }
 
+    const plan = getAntigravityPlanLabel(subscriptionInfo, providerSpecificData);
+    logAntigravityTierDebug("error", subscriptionInfo, providerSpecificData, plan, {
+      errorMessage: (error as Error).message,
+    });
+
     return {
-      plan: getAntigravityPlanLabel(subscriptionInfo, providerSpecificData),
+      plan,
       subscriptionInfo,
       message: `Antigravity error: ${(error as Error).message}`,
     };
