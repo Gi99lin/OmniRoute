@@ -233,7 +233,7 @@ export default function CavemanContextPageClient() {
       )}
 
       <section className="rounded-lg border border-border bg-surface p-4">
-        <h2 className="text-sm font-semibold text-text-main">Input compression</h2>
+        <h2 className="text-sm font-semibold text-text-main">{t("inputCompressionTitle")}</h2>
         <p className="mt-1 text-xs text-text-muted">
           Rewrite chat history with shorter wording. Reduces input tokens by ~50%.
         </p>

@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 const providerLimitUtils =
   await import("../../src/app/(dashboard)/dashboard/usage/components/ProviderLimits/utils.tsx");
@@ -123,4 +125,52 @@ test("GLM quota rows are ordered by session, weekly, then monthly", () => {
     parsed.map((quota) => quota.name),
     ["session", "weekly", "mcp_monthly"]
   );
+});
+
+test("dashboard i18n keys used by OrFallback helpers exist in en.json", () => {
+  const enPath = path.resolve("src/i18n/messages/en.json");
+  const messages = JSON.parse(readFileSync(enPath, "utf8"));
+
+  const required: Array<[string, string]> = [
+    ["combos", "emailVisibilityHint"],
+    ["combos", "configOnlyStatus"],
+    ["settings", "codexFastTierTierLabel"],
+    ["providers", "antigravityClientProfileLabel"],
+    ["providers", "codexFastTierActiveChip"],
+    ["cache", "loadingCacheAria"],
+    ["costs", "legacyFreeLabel"],
+    ["contextCaveman", "inputCompressionTitle"],
+  ];
+
+  for (const [ns, key] of required) {
+    const value = messages[ns]?.[key];
+    assert.equal(typeof value, "string", `${ns}.${key} should be defined in en.json`);
+    assert.ok(!value.startsWith("__MISSING__:"), `${ns}.${key} should not be a placeholder`);
+  }
+});
+
+test("usage namespace includes Provider Limits UI translation keys", () => {
+  const enPath = path.resolve("src/i18n/messages/en.json");
+  const messages = JSON.parse(readFileSync(enPath, "utf8"));
+  const usage = messages.usage;
+
+  for (const key of [
+    "statTotal",
+    "statCritical",
+    "statAlert",
+    "statHealthy",
+    "filterPurchaseTypeLabel",
+    "filterTierLabel",
+    "purchaseAll",
+    "purchaseOauthSub",
+    "purchaseOauthFree",
+    "purchaseApiKey",
+    "tierLite",
+    "resetsIn",
+    "editCutoffs",
+    "forceRefresh",
+  ]) {
+    assert.equal(typeof usage[key], "string", `usage.${key} should be defined in en.json`);
+    assert.ok(!usage[key].startsWith("__MISSING__:"), `usage.${key} should not be a placeholder`);
+  }
 });
