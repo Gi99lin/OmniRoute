@@ -1606,13 +1606,18 @@ async function fetchAntigravityAvailableModelsCached(
  * Extracts tier from allowedTiers[].isDefault (same logic as providers.js postExchange).
  * Falls back to currentTier.id → currentTier.name → "Free".
  */
-function getAntigravityPlanLabel(subscriptionInfo: unknown): string {
+function getAntigravityPlanLabel(subscriptionInfo: unknown, fallbackInfo?: unknown): string {
   const subscription = toRecord(subscriptionInfo);
-  if (Object.keys(subscription).length === 0) return "Free";
+  if (Object.keys(subscription).length === 0) {
+    return fallbackInfo == null ? "Free" : getAntigravityPlanLabel(fallbackInfo);
+  }
 
-  // 1. Extract tier from allowedTiers (primary source — same as providers.js)
-  let tierId = "";
-  if (Array.isArray(subscription.allowedTiers)) {
+  // 1. Prefer currentTier.id: allowedTiers may mark the free tier as default.
+  const currentTier = toRecord(subscription.currentTier);
+  let tierId = typeof currentTier.id === "string" ? currentTier.id.toUpperCase() : "";
+
+  // 2. Fall back to allowedTiers[].isDefault.
+  if (!tierId && Array.isArray(subscription.allowedTiers)) {
     for (const tierValue of subscription.allowedTiers) {
       const tier = toRecord(tierValue);
       if (tier.isDefault && typeof tier.id === "string") {
@@ -1622,12 +1627,6 @@ function getAntigravityPlanLabel(subscriptionInfo: unknown): string {
     }
   }
 
-  // 2. Fall back to currentTier.id
-  if (!tierId) {
-    const currentTier = toRecord(subscription.currentTier);
-    tierId = typeof currentTier.id === "string" ? currentTier.id.toUpperCase() : "";
-  }
-
   // 3. Map tier ID to display label
   if (tierId) {
     if (tierId.includes("ULTRA")) return "Ultra";
@@ -1635,12 +1634,12 @@ function getAntigravityPlanLabel(subscriptionInfo: unknown): string {
     if (tierId.includes("ENTERPRISE")) return "Enterprise";
     if (tierId.includes("BUSINESS") || tierId.includes("STANDARD")) return "Business";
     if (tierId.includes("FREE") || tierId.includes("INDIVIDUAL") || tierId.includes("LEGACY"))
-      return "Free";
+      return fallbackInfo == null ? "Free" : getAntigravityPlanLabel(fallbackInfo);
   }
 
   // 4. Try tier name fields as last resort
   const tierName = String(
-    getFieldValue(toRecord(subscription.currentTier), "name", "displayName") ||
+    getFieldValue(currentTier, "name", "displayName") ||
       subscription.subscriptionType ||
       subscription.tier ||
       ""
@@ -1651,17 +1650,21 @@ function getAntigravityPlanLabel(subscriptionInfo: unknown): string {
   if (upper.includes("PRO")) return "Pro";
   if (upper.includes("ENTERPRISE")) return "Enterprise";
   if (upper.includes("STANDARD") || upper.includes("BUSINESS")) return "Business";
-  if (upper.includes("INDIVIDUAL") || upper.includes("FREE")) return "Free";
+  if (upper.includes("INDIVIDUAL") || upper.includes("FREE")) {
+    return fallbackInfo == null ? "Free" : getAntigravityPlanLabel(fallbackInfo);
+  }
 
   // 5. If upgradeSubscriptionType exists, account is on free tier
-  if (toRecord(subscription.currentTier).upgradeSubscriptionType) return "Free";
+  if (currentTier.upgradeSubscriptionType) {
+    return fallbackInfo == null ? "Free" : getAntigravityPlanLabel(fallbackInfo);
+  }
 
   // 6. If we have a tier name that didn't match known patterns, return it title-cased
   if (tierName) {
     return tierName.charAt(0).toUpperCase() + tierName.slice(1).toLowerCase();
   }
 
-  return "Free";
+  return fallbackInfo == null ? "Free" : getAntigravityPlanLabel(fallbackInfo);
 }
 
 /**
@@ -1831,8 +1834,19 @@ async function getAntigravityUsage(
       accessToken,
       providerSpecificData
     );
+    const savedProjectId =
+      typeof providerSpecificData?.projectId === "string" && providerSpecificData.projectId.trim()
+        ? providerSpecificData.projectId.trim()
+        : null;
+    const subscriptionProject = toRecord(subscriptionInfo).cloudaicompanionProject;
     const projectId =
-      connectionProjectId || toRecord(subscriptionInfo).cloudaicompanionProject?.toString() || null;
+      savedProjectId ||
+      connectionProjectId ||
+      (typeof subscriptionProject === "string"
+        ? subscriptionProject
+        : typeof toRecord(subscriptionProject).id === "string"
+          ? (toRecord(subscriptionProject).id as string)
+          : null);
 
     // Derive accountId for credit balance cache.
     // Must match executor key: credentials.connectionId
@@ -1897,7 +1911,7 @@ async function getAntigravityUsage(
     }
 
     return {
-      plan: getAntigravityPlanLabel(subscriptionInfo),
+      plan: getAntigravityPlanLabel(subscriptionInfo, providerSpecificData),
       quotas: {
         ...quotas,
         ...(creditBalance !== null && {
@@ -1913,7 +1927,21 @@ async function getAntigravityUsage(
       subscriptionInfo,
     };
   } catch (error) {
-    return { message: `Antigravity error: ${(error as Error).message}` };
+    let subscriptionInfo: unknown = null;
+    try {
+      subscriptionInfo = await getAntigravitySubscriptionInfoCached(
+        accessToken,
+        providerSpecificData
+      );
+    } catch {
+      subscriptionInfo = null;
+    }
+
+    return {
+      plan: getAntigravityPlanLabel(subscriptionInfo, providerSpecificData),
+      subscriptionInfo,
+      message: `Antigravity error: ${(error as Error).message}`,
+    };
   }
 }
 

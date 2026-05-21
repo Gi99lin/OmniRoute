@@ -82,7 +82,9 @@ export const antigravity = {
       });
       const data = await loadRes.json();
       projectId = data.cloudaicompanionProject?.id || data.cloudaicompanionProject || "";
-      if (Array.isArray(data.allowedTiers)) {
+      if (typeof data.currentTier?.id === "string" && data.currentTier.id.trim()) {
+        tierId = data.currentTier.id.trim();
+      } else if (Array.isArray(data.allowedTiers)) {
         for (const tier of data.allowedTiers) {
           if (tier.isDefault && tier.id) {
             tierId = tier.id.trim();
@@ -118,7 +120,7 @@ export const antigravity = {
       }
     }
 
-    return { userInfo, projectId };
+    return { userInfo, projectId, tierId };
   },
   mapTokens: (tokens, extra) => ({
     accessToken: tokens.access_token,
@@ -127,5 +129,9 @@ export const antigravity = {
     scope: tokens.scope,
     email: extra?.userInfo?.email,
     projectId: extra?.projectId,
+    providerSpecificData: {
+      projectId: extra?.projectId,
+      tier: extra?.tierId,
+    },
   }),
 };

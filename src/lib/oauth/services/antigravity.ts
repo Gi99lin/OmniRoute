@@ -147,7 +147,9 @@ export class AntigravityService {
 
     // Extract tier ID (default to legacy-tier)
     let tierId = "legacy-tier";
-    if (Array.isArray(data.allowedTiers)) {
+    if (typeof data.currentTier?.id === "string" && data.currentTier.id.trim()) {
+      tierId = data.currentTier.id.trim();
+    } else if (Array.isArray(data.allowedTiers)) {
       for (const tier of data.allowedTiers) {
         if (tier.isDefault && tier.id) {
           tierId = tier.id.trim();

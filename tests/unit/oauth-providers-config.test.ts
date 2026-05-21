@@ -446,7 +446,8 @@ test("Gemini and Antigravity run mocked browser OAuth exchanges and post-exchang
       assert.equal(JSON.parse(String(init.body)).cloudaicompanionProject, undefined);
       return jsonResponse({
         cloudaicompanionProject: { id: "anti-project" },
-        allowedTiers: [{ id: "tier-default", isDefault: true }],
+        currentTier: { id: "tier_google_one_ai_pro" },
+        allowedTiers: [{ id: "free-tier", isDefault: true }],
       });
     },
     (_url, init: any = {}) => {
@@ -458,7 +459,7 @@ test("Gemini and Antigravity run mocked browser OAuth exchanges and post-exchang
         JSON.parse(String(init.body)).metadata,
         getAntigravityLoadCodeAssistMetadata()
       );
-      assert.equal(JSON.parse(String(init.body)).tier_id, "tier-default");
+      assert.equal(JSON.parse(String(init.body)).tier_id, "tier_google_one_ai_pro");
       assert.equal(JSON.parse(String(init.body)).cloudaicompanionProject, undefined);
       return jsonResponse({
         done: true,
@@ -487,6 +488,7 @@ test("Gemini and Antigravity run mocked browser OAuth exchanges and post-exchang
   assert.equal(geminiMapped.projectId, "gemini-project");
   assert.equal(antigravityMapped.email, "anti@example.com");
   assert.equal(antigravityMapped.projectId, "anti-project-final");
+  assert.equal(antigravityMapped.providerSpecificData.tier, "tier_google_one_ai_pro");
 });
 
 test("Qoder enabled mode exchanges tokens and loads profile metadata through mocked endpoints", async () => {

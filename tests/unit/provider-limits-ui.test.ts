@@ -33,6 +33,17 @@ test("Codex workspacePlanType is used when live plan is missing or unknown", () 
   assert.equal(tier.variant, "success");
 });
 
+test("Antigravity saved tier overrides generic live Free fallback", () => {
+  const resolvedPlan = providerLimitUtils.resolvePlanValue("Free", {
+    tier: "tier_google_one_ai_pro",
+  });
+
+  assert.equal(resolvedPlan, "tier_google_one_ai_pro");
+  const tier = providerLimitUtils.normalizePlanTier(resolvedPlan);
+  assert.equal(tier.key, "pro");
+  assert.equal(tier.label, "Pro");
+});
+
 test("Claude providerSpecificData plan is used when live plan is missing", () => {
   const resolvedPlan = providerLimitUtils.resolvePlanValue(null, {
     plan: "Pro",
