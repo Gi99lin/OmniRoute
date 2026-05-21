@@ -1,31 +1,32 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import Badge from "@/shared/components/Badge";
-import ProviderIcon from "@/shared/components/ProviderIcon";
 import { pickDisplayValue } from "@/shared/utils/maskEmail";
 import { calculatePercentage, formatQuotaLabel } from "./utils";
 import { translateUsageOrFallback, type UsageTranslationValues } from "./i18nFallback";
 import type { ResolvedColumn } from "./providerColumns";
 
 /**
- * One row inside a ProviderGroup table.
+ * One row inside a ProviderGroup's content column.
  *
- * Collapsed view: provider identity + account identity + tier badge + one cell per resolved
- * column + overflow count + cutoff/refresh actions.
+ * Collapsed view: account identity + tier badge + one cell per resolved
+ * column + overflow count + cutoff/refresh actions. Provider identity is
+ * rendered by the parent's left rail, not here.
  *
- * Expanded panel (`isExpanded`): full quota detail with progress bars,
- * countdown, credits balance, and the in-panel "Edit cutoffs" /
- * "Refresh now" buttons — same UX as the previous flat layout.
+ * Expanded panel (`isExpanded`): full quota detail laid out as a 2-column
+ * grid inside the right content area (no full-page-width stretch). Quotas
+ * whose remaining=100% and used=0 are hidden behind a "Show N unused"
+ * toggle so the panel stays compact on providers like Antigravity.
  *
- * All semantics preserved from the original `renderRow`:
+ * All semantics preserved from earlier iterations:
  * - `pct` is *remaining* (high = green, low = red)
  * - `unlimited`, `staleAfterReset`, `isCredits` branches intact
  * - row click toggles expansion; nested controls stop propagation
  */
 interface AccountRowProps {
   connection: any;
-  providerLabel: string;
   quota: { quotas?: any[]; plan?: string | null; message?: string | null; stale?: any } | undefined;
   loading: boolean;
   error: string | null;
@@ -39,7 +40,7 @@ interface AccountRowProps {
   overflowCount: number;
   isExpanded: boolean;
   emailsVisible: boolean;
-  /** Grid template that the parent ProviderGroup uses for its header.
+  /** Grid template the parent ProviderGroup uses for the column-header row.
    *  Passed in so account cells align with column headers pixel-perfectly. */
   gridTemplateColumns: string;
   onToggle: () => void;
@@ -97,9 +98,24 @@ function formatCountdown(resetAt: string | null | undefined): string | null {
   }
 }
 
+/**
+ * A quota is "unused" when nothing has been consumed: full remaining and no
+ * recorded usage. Credits-balance entries are never counted here — they
+ * always carry meaning (account funded amount).
+ */
+function isUntouched(q: any): boolean {
+  if (!q) return false;
+  if (q.isCredits) return false;
+  const used = Number(q.used || 0);
+  const remainingPct =
+    q.remainingPercentage !== undefined
+      ? Number(q.remainingPercentage)
+      : calculatePercentage(used, Number(q.total || 0));
+  return used === 0 && remainingPct >= 100;
+}
+
 export default function AccountRow({
   connection,
-  providerLabel,
   quota,
   loading,
   error,
@@ -121,6 +137,11 @@ export default function AccountRow({
   const t = useTranslations("usage");
   const tr = (key: string, fallback: string, values?: UsageTranslationValues) =>
     translateUsageOrFallback(t, key, fallback, values);
+
+  // Local toggle for the expanded panel — show all quotas including
+  // untouched ones. Default off keeps the panel compact for Antigravity
+  // and other model-heavy providers.
+  const [showUnused, setShowUnused] = useState(false);
 
   const overrides = (connection.quotaWindowThresholds || null) as Record<string, number> | null;
   const hasOverrides = overrides && Object.keys(overrides).length > 0;
@@ -145,9 +166,20 @@ export default function AccountRow({
     connection.provider
   );
 
-  // Render one column cell — a mini bar + percentage + (optional)
-  // unlimited marker. Empty cell is an em-dash so the column reads as
-  // "no data" rather than "0%".
+  const allQuotas = quota?.quotas || [];
+  const { visibleQuotas, untouchedCount } = useMemo(() => {
+    if (showUnused) return { visibleQuotas: allQuotas, untouchedCount: 0 };
+    const visible: any[] = [];
+    let untouched = 0;
+    for (const q of allQuotas) {
+      if (isUntouched(q)) untouched += 1;
+      else visible.push(q);
+    }
+    return { visibleQuotas: visible, untouchedCount: untouched };
+  }, [allQuotas, showUnused]);
+
+  // Render one column cell — small number + mini bar 24px. Empty cell is
+  // an em-dash so the column reads as "no data" rather than "0%".
   const renderColumnCell = (col: ResolvedColumn) => {
     const q = col.quota;
     if (!q) {
@@ -162,8 +194,6 @@ export default function AccountRow({
       );
     }
     if (q.isCredits) {
-      // Should not happen for column cells (credits filtered out upstream),
-      // but render a balance pill defensively.
       const colors = getBarColor(q.remainingPercentage ?? 0);
       const sym = CURRENCY_SYMBOLS[q.currency] ?? q.currency ?? "";
       return (
@@ -193,22 +223,20 @@ export default function AccountRow({
 
     return (
       <div key={col.key} className="flex items-center gap-1.5 min-w-0" title={tooltip}>
-        <div className="flex items-center gap-0.5 shrink-0">
+        <span
+          className="text-[12px] font-semibold tabular-nums leading-none shrink-0"
+          style={{ color: colors.text }}
+        >
+          {q.unlimited ? "∞" : `${pct}%`}
+        </span>
+        {q.staleAfterReset && (
           <span
-            className="text-[12px] font-semibold tabular-nums leading-none"
-            style={{ color: colors.text }}
+            className="material-symbols-outlined text-[12px] text-amber-500 shrink-0"
+            title={t("staleQuotaTooltip")}
           >
-            {q.unlimited ? "∞" : `${pct}%`}
+            autorenew
           </span>
-          {q.staleAfterReset && (
-            <span
-              className="material-symbols-outlined text-[12px] text-amber-500 shrink-0"
-              title={t("staleQuotaTooltip")}
-            >
-              autorenew
-            </span>
-          )}
-        </div>
+        )}
         {!q.unlimited && (
           <div className="h-1 w-6 rounded-full bg-black/[0.06] dark:bg-white/[0.06] overflow-hidden shrink-0">
             <div
@@ -224,9 +252,9 @@ export default function AccountRow({
     );
   };
 
-  // Detailed expanded panel — same layout as the original `renderQuotaDetail`.
-  // We keep this verbatim because the panel is the primary place users see
-  // raw numbers (used/total, ISO countdown).
+  // Compact single-line detail row used inside the expanded panel's
+  // 2-column grid. Shows: name pill + used/total + countdown + bar + %.
+  // No card wrapper — the parent grid gives the visual separation.
   const renderQuotaDetail = (q: any, i: number) => {
     if (q.isCredits) {
       const colors = getBarColor(q.remainingPercentage ?? 0);
@@ -238,28 +266,30 @@ export default function AccountRow({
       return (
         <div
           key={i}
-          className="rounded-md border border-border bg-bg/40 px-3 py-2.5 flex items-center justify-between gap-3"
+          className="flex items-center justify-between gap-2 px-2 py-1.5 rounded border border-border/60 bg-bg/30 min-w-0"
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="material-symbols-outlined text-[18px]" style={{ color: colors.text }}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span
+              className="material-symbols-outlined text-[14px] shrink-0"
+              style={{ color: colors.text }}
+            >
               paid
             </span>
-            <div className="min-w-0">
-              <div className="text-[12px] font-semibold text-text-main">
-                {formatQuotaLabel(q.name) || tr("creditsLabel", "Credits")}
-              </div>
-              <div className="text-[10px] text-text-muted">
-                {tr("creditBalanceHint", "Saldo restante")}
-              </div>
-            </div>
+            <span className="text-[11px] font-semibold text-text-main truncate">
+              {formatQuotaLabel(q.name) || tr("creditsLabel", "Credits")}
+            </span>
           </div>
-          <div className="text-[16px] font-bold tabular-nums" style={{ color: colors.text }}>
+          <span
+            className="text-[12px] font-bold tabular-nums shrink-0"
+            style={{ color: colors.text }}
+          >
             {sym}
             {amount}
-          </div>
+          </span>
         </div>
       );
     }
+
     const pctRaw = q.unlimited
       ? 100
       : (q.remainingPercentage ?? calculatePercentage(q.used, q.total));
@@ -271,55 +301,46 @@ export default function AccountRow({
     const usedNum = Number(q.used || 0);
     const totalNum = Number(q.total || 0);
     const showUsage = totalNum > 0 && !q.unlimited;
+
     return (
-      <div key={i} className="rounded-md border border-border bg-bg/40 px-3 py-2.5">
-        <div className="flex items-center justify-between gap-2 mb-1.5 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              className="text-[12px] font-semibold py-0.5 px-2 rounded truncate max-w-[120px] sm:max-w-[150px] inline-block shrink-0"
-              style={{ background: colors.bg, color: colors.text }}
-              title={q.modelKey || q.name}
-            >
-              {shortName}
-            </span>
-            {q.unlimited && (
-              <span className="text-[10px] text-text-muted shrink-0">
-                {tr("unlimitedLabel", "Unlimited")}
-              </span>
-            )}
-            {showUsage && (
-              <span className="text-[10px] text-text-muted tabular-nums shrink-0">
-                {usedNum.toLocaleString()} / {totalNum.toLocaleString()}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0 min-w-0">
-            {staleAfterReset ? (
-              <span className="text-[10px] text-text-muted shrink-0">
-                ⟳ {tr("refreshing", "Refreshing")}
-              </span>
-            ) : cd ? (
-              <span
-                className="text-[10px] text-text-muted shrink-0 truncate max-w-[85px]"
-                title={`${tr("resetsIn", "reset em")} ${cd}`}
-              >
-                ⏱ {cd}
-              </span>
-            ) : null}
-            <span
-              className="text-[12px] font-bold tabular-nums text-right shrink-0"
-              style={{ color: colors.text }}
-            >
-              {pct}%
-            </span>
+      <div
+        key={i}
+        className="flex items-center gap-2 px-2 py-1.5 rounded border border-border/60 bg-bg/30 min-w-0"
+        title={q.modelKey || q.name}
+      >
+        <span
+          className="text-[11px] font-semibold py-0.5 px-1.5 rounded truncate shrink-0 max-w-[140px]"
+          style={{ background: colors.bg, color: colors.text }}
+        >
+          {shortName}
+        </span>
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          <div className="h-1.5 flex-1 min-w-[40px] rounded-full bg-black/[0.06] dark:bg-white/[0.06] overflow-hidden">
+            <div
+              className="h-full rounded-full transition-[width] duration-300 ease-out"
+              style={{ width: `${Math.min(pct, 100)}%`, background: colors.bar }}
+            />
           </div>
         </div>
-        <div className="h-2 rounded-sm bg-black/[0.06] dark:bg-white/[0.06] overflow-hidden">
-          <div
-            className="h-full rounded-sm transition-[width] duration-300 ease-out"
-            style={{ width: `${Math.min(pct, 100)}%`, background: colors.bar }}
-          />
+        <div className="flex items-center gap-1.5 text-[10px] text-text-muted tabular-nums shrink-0">
+          {showUsage && (
+            <span title={`${usedNum.toLocaleString()} / ${totalNum.toLocaleString()}`}>
+              {usedNum.toLocaleString()}/{totalNum.toLocaleString()}
+            </span>
+          )}
+          {q.unlimited && <span>{tr("unlimitedLabel", "∞")}</span>}
+          {staleAfterReset ? (
+            <span title={tr("refreshing", "Refreshing")}>⟳</span>
+          ) : cd ? (
+            <span title={`${tr("resetsIn", "reset")} ${cd}`}>⏱{cd}</span>
+          ) : null}
         </div>
+        <span
+          className="text-[12px] font-bold tabular-nums shrink-0 min-w-[34px] text-right"
+          style={{ color: colors.text }}
+        >
+          {pct}%
+        </span>
       </div>
     );
   };
@@ -341,7 +362,7 @@ export default function AccountRow({
             onToggle();
           }
         }}
-        className="w-full text-left items-center px-3 py-2.5 transition-[background] duration-150 hover:bg-black/[0.03] dark:hover:bg-white/[0.02] cursor-pointer"
+        className="w-full text-left items-center px-3 py-2 transition-[background] duration-150 hover:bg-black/[0.03] dark:hover:bg-white/[0.02] cursor-pointer"
         style={{
           display: "grid",
           gridTemplateColumns,
@@ -352,26 +373,13 @@ export default function AccountRow({
         }}
         aria-expanded={isExpanded}
       >
-        {/* Provider identity */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-5 h-5 rounded flex items-center justify-center overflow-hidden shrink-0">
-            <ProviderIcon
-              providerId={connection.provider}
-              size={18}
-              type="color"
-              className="object-contain"
-            />
-          </div>
-          <span className="text-[12px] font-semibold text-text-main truncate">{providerLabel}</span>
-        </div>
-
         {/* Account identity */}
         <div className="flex items-center gap-2 min-w-0">
           <span className="material-symbols-outlined text-[16px] text-text-muted shrink-0">
             {isExpanded ? "expand_less" : "expand_more"}
           </span>
-          <div className="min-w-0">
-            <div className="text-[13px] font-semibold text-text-main truncate">{accountName}</div>
+          <div className="text-[13px] font-semibold text-text-main truncate min-w-0">
+            {accountName}
           </div>
         </div>
 
@@ -422,7 +430,7 @@ export default function AccountRow({
           columns.map(renderColumnCell)
         )}
 
-        {/* Overflow count (e.g. "+11" for Antigravity) */}
+        {/* Overflow count */}
         <div className="text-[11px] text-text-muted text-center tabular-nums">
           {overflowCount > 0 ? `+${overflowCount}` : ""}
         </div>
@@ -504,9 +512,10 @@ export default function AccountRow({
         </div>
       </div>
 
-      {/* Expanded panel */}
+      {/* Expanded panel — inline within the right content area, not the
+          whole page. 2-column responsive grid + show/hide unused toggle. */}
       {isExpanded && (
-        <div className="px-12 py-3.5 bg-bg-subtle/30 border-t border-border flex flex-col gap-3">
+        <div className="px-4 py-3 bg-bg-subtle/30 border-t border-border flex flex-col gap-2.5">
           {loading ? (
             <div className="text-xs text-text-muted flex items-center gap-1.5">
               <span className="material-symbols-outlined animate-spin text-[14px]">
@@ -519,36 +528,57 @@ export default function AccountRow({
               <span className="material-symbols-outlined text-[14px]">error</span>
               <span>{error}</span>
             </div>
-          ) : quota?.quotas && quota.quotas.length > 0 ? (
+          ) : allQuotas.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {quota.quotas.map(renderQuotaDetail)}
-              </div>
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40 mt-1">
-                <button
-                  type="button"
-                  disabled={!connectionHasWindows}
-                  onClick={onOpenCutoff}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-md border border-border bg-bg-subtle hover:bg-black/[0.04] dark:hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[14px]">tune</span>
-                  {tr("editCutoffs", "Editar Cutoffs")}
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={onRefresh}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-md border border-border bg-bg-subtle hover:bg-black/[0.04] dark:hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <span
-                    className={`material-symbols-outlined text-[14px] ${
-                      loading ? "animate-spin" : ""
-                    }`}
+              {visibleQuotas.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {visibleQuotas.map(renderQuotaDetail)}
+                </div>
+              ) : (
+                <div className="text-[11px] text-text-muted italic">
+                  {tr("allQuotasUnused", "All quotas untouched")}
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/40">
+                {untouchedCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowUnused((v) => !v)}
+                    className="text-[11px] text-text-muted hover:text-text-main underline-offset-2 hover:underline cursor-pointer"
                   >
-                    refresh
-                  </span>
-                  {tr("forceRefresh", "Refresh agora")}
-                </button>
+                    {showUnused
+                      ? tr("hideUnusedQuotas", "Hide untouched")
+                      : tr("showUnusedQuotas", "Show {count} untouched", { count: untouchedCount })}
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!connectionHasWindows}
+                    onClick={onOpenCutoff}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border border-border bg-bg-subtle hover:bg-black/[0.04] dark:hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">tune</span>
+                    {tr("editCutoffs", "Editar Cutoffs")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={onRefresh}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border border-border bg-bg-subtle hover:bg-black/[0.04] dark:hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <span
+                      className={`material-symbols-outlined text-[13px] ${
+                        loading ? "animate-spin" : ""
+                      }`}
+                    >
+                      refresh
+                    </span>
+                    {tr("forceRefresh", "Refresh agora")}
+                  </button>
+                </div>
               </div>
             </>
           ) : (
