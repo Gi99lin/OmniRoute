@@ -76,7 +76,7 @@ const TIER_FILTERS = [
   { key: "ultra", labelKey: "tierUltra" },
   { key: "pro", labelKey: "tierPro" },
   { key: "plus", labelKey: "tierPlus" },
-  { key: "lite", label: "Lite" },
+  { key: "lite", labelKey: "tierLite" },
   { key: "free", labelKey: "tierFree" },
   { key: "unknown", labelKey: "tierUnknown" },
 ];
@@ -729,9 +729,9 @@ export default function ProviderLimits() {
           const tone = STATUS_TONE[key];
           const labelMap: Record<string, string> = {
             all: tr("statTotal", "Total"),
-            critical: tr("statCritical", "Crítico"),
-            alert: tr("statAlert", "Alerta"),
-            ok: tr("statHealthy", "Saudável"),
+            critical: tr("statCritical", "Critical"),
+            alert: tr("statAlert", "Alert"),
+            ok: tr("statHealthy", "Healthy"),
           };
           const active = statusFilter === key;
           const count = statusCounts[key] || 0;
@@ -772,7 +772,7 @@ export default function ProviderLimits() {
       {/* Purchase Type filter */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[11px] uppercase tracking-wider text-text-muted font-semibold mr-1">
-          {tr("filterPurchaseTypeLabel", "Tipo")}
+          {tr("filterPurchaseTypeLabel", "Type")}
         </span>
         {PURCHASE_TYPES.map((type) => {
           const count = purchaseTypeCounts[type.key] || 0;
