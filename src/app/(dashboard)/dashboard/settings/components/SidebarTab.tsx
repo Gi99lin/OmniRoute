@@ -211,7 +211,11 @@ interface ItemRowProps {
   getLabel: (key: string, fallback: string) => string;
 }
 
+// Items that must always remain visible (safety guard)
+const PROTECTED_ITEM_IDS = new Set(["settings-sidebar"]);
+
 function ItemRow({ item, hiddenSet, onToggleItem, getLabel }: ItemRowProps) {
+  const isProtected = PROTECTED_ITEM_IDS.has(item.id);
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="flex items-center gap-2 min-w-0">
@@ -220,7 +224,17 @@ function ItemRow({ item, hiddenSet, onToggleItem, getLabel }: ItemRowProps) {
         </span>
         <p className="font-medium truncate">{getLabel(item.i18nKey, item.id)}</p>
       </div>
-      <Toggle checked={!hiddenSet.has(item.id)} onChange={() => onToggleItem(item.id)} />
+      {isProtected ? (
+        <span
+          className="material-symbols-outlined text-[16px] text-text-muted/40"
+          title="This item cannot be hidden"
+          aria-label="Always visible"
+        >
+          lock
+        </span>
+      ) : (
+        <Toggle checked={!hiddenSet.has(item.id)} onChange={() => onToggleItem(item.id)} />
+      )}
     </div>
   );
 }
@@ -341,6 +355,8 @@ export default function SidebarTab() {
   };
 
   const toggleItem = (id: HideableSidebarItemId) => {
+    // Protected items can never be hidden
+    if (PROTECTED_ITEM_IDS.has(id)) return;
     const next = hiddenSidebarItems.includes(id)
       ? hiddenSidebarItems.filter((x) => x !== id)
       : [...hiddenSidebarItems, id];
@@ -395,13 +411,15 @@ export default function SidebarTab() {
   const applyPreset = (presetId: SidebarPresetId) => {
     const preset = SIDEBAR_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
-    setHiddenSidebarItems(preset.hiddenItems);
+    // Ensure protected items are never hidden, even if a preset includes them
+    const safeHidden = preset.hiddenItems.filter((id) => !PROTECTED_ITEM_IDS.has(id));
+    setHiddenSidebarItems(safeHidden);
     setSectionOrder([]);
     setItemOrder({});
     setActivePreset(presetId);
     setConfirmPreset(null);
     patch({
-      [HIDDEN_SIDEBAR_ITEMS_SETTING_KEY]: preset.hiddenItems,
+      [HIDDEN_SIDEBAR_ITEMS_SETTING_KEY]: safeHidden,
       [SIDEBAR_SECTION_ORDER_KEY]: [],
       [SIDEBAR_ITEM_ORDER_KEY]: {},
       [SIDEBAR_PRESET_KEY]: presetId,
