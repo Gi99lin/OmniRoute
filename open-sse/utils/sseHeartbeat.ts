@@ -1,6 +1,4 @@
-// Kept in sync with runtimeTimeouts.ts: 4s stays under the ~5s idle-read timeout of
-// strict clients like Codex CLI's reqwest (#2544).
-export const DEFAULT_SSE_HEARTBEAT_INTERVAL_MS = 4_000;
+export const DEFAULT_SSE_HEARTBEAT_INTERVAL_MS = 15_000;
 
 export const HEARTBEAT_SHAPES = {
   COMMENT: "comment",

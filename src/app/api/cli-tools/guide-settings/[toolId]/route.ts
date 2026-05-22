@@ -18,6 +18,10 @@ import { resolveApiKey, getOrCreateApiKey } from "@/shared/services/apiKeyResolv
  * Currently supports: continue, opencode
  */
 export async function GET(request, { params }) {
+  // cli-tools routes require the shared management auth guard on every exported handler.
+  const authError = await requireCliToolsAuth(request);
+  if (authError) return authError;
+  void params;
   return NextResponse.json({ error: "GET not supported for this tool" }, { status: 400 });
 }
 

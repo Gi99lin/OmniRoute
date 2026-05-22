@@ -13,7 +13,8 @@ const DUMMY_HOME = path.join(os.tmpdir(), "omniroute-qwen-test-" + Date.now());
 const QWEN_CONFIG_PATH = path.join(DUMMY_HOME, ".qwen", "settings.json");
 const QWEN_ENV_PATH = path.join(DUMMY_HOME, ".qwen", ".env");
 const OPENCODE_CONFIG_PATH = path.join(DUMMY_HOME, ".config", "opencode", "opencode.json");
-const HERMES_CONFIG_PATH = path.join(DUMMY_HOME, ".hermes", "config.yaml");
+// cliRuntime.ts hermes entry maps to .config/hermes/config.json (not .hermes/config.yaml)
+const HERMES_CONFIG_PATH = path.join(DUMMY_HOME, ".config", "hermes", "config.json");
 const originalXDG = process.env.XDG_CONFIG_HOME;
 const originalAppData = process.env.APPDATA;
 const originalJwtSecret = process.env.JWT_SECRET;

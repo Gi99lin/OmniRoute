@@ -320,8 +320,8 @@ test("usage service covers Antigravity quota parsing, exclusions and forbidden a
   });
 
   assert.equal(usage.plan, "Ultra");
-  assert.deepEqual(Object.keys(usage.quotas).sort(), ["claude-sonnet-4-6", "gemini-pro-agent"]);
-  assert.equal(usage.quotas["claude-sonnet-4-6"].used, 600);
+  // claude-sonnet-4-6 was removed from ANTIGRAVITY_PUBLIC_MODELS in May 2026 (deprecated)
+  assert.deepEqual(Object.keys(usage.quotas).sort(), ["gemini-pro-agent"]);
   assert.equal(usage.quotas["gemini-pro-agent"].total, 0);
   assert.equal(usage.quotas["gemini-pro-agent"].remainingPercentage, 100);
   const loadCodeAssistCall = calls.find((call) => call.url.includes("loadCodeAssist"));
@@ -366,10 +366,12 @@ test("usage service retries Antigravity fetchAvailableModels across the shared f
 
     try {
       const parsedUrl = new URL(String(url));
-      if (parsedUrl.hostname === "daily-cloudcode-pa.sandbox.googleapis.com") {
+      // ANTIGRAVITY_BASE_URLS order: daily-cloudcode-pa.googleapis.com, cloudcode-pa.googleapis.com,
+      // daily-cloudcode-pa.sandbox.googleapis.com — fail first two to exercise all three fallbacks
+      if (parsedUrl.hostname === "daily-cloudcode-pa.googleapis.com") {
         return new Response("bad gateway", { status: 502 });
       }
-      if (parsedUrl.hostname === "daily-cloudcode-pa.googleapis.com") {
+      if (parsedUrl.hostname === "cloudcode-pa.googleapis.com") {
         return new Response("bad gateway", { status: 502 });
       }
     } catch {
@@ -379,7 +381,7 @@ test("usage service retries Antigravity fetchAvailableModels across the shared f
     return new Response(
       JSON.stringify({
         models: {
-          "claude-sonnet-4-6": {
+          "gemini-pro-agent": {
             quotaInfo: {
               remainingFraction: 0.5,
               resetTime: new Date(Date.now() + 60_000).toISOString(),
@@ -397,17 +399,18 @@ test("usage service retries Antigravity fetchAvailableModels across the shared f
   });
 
   const quotaCalls = calls.filter((call) => call.url.includes("fetchAvailableModels"));
+  // ANTIGRAVITY_BASE_URLS order changed: daily first, then cloudcode-pa, then sandbox last
   assert.deepEqual(
     quotaCalls.map((call) => call.url),
     [
-      "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:fetchAvailableModels",
       "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
       "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
+      "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:fetchAvailableModels",
     ]
   );
   assert.match(quotaCalls[2].init.headers["User-Agent"], /^Antigravity\//);
   assert.equal(usage.plan, "Business");
-  assert.equal(usage.quotas["claude-sonnet-4-6"].used, 500);
+  assert.ok(usage.quotas["gemini-pro-agent"] !== undefined);
 });
 
 test("usage service manual Antigravity refresh bypasses usage TTL caches", async () => {

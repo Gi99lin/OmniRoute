@@ -8,10 +8,7 @@ type ReadTimeoutOptions = {
 
 export const DEFAULT_FETCH_TIMEOUT_MS = 600_000;
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 600_000;
-// 4s keeps the downstream connection active under the ~5s idle-read timeout used by
-// strict HTTP clients such as Codex CLI's reqwest, which dropped mid-stream during long
-// upstream thinking phases at the previous 15s cadence (#2544). Override via env.
-export const DEFAULT_SSE_HEARTBEAT_INTERVAL_MS = 4_000;
+export const DEFAULT_SSE_HEARTBEAT_INTERVAL_MS = 15_000;
 export const DEFAULT_STREAM_READINESS_TIMEOUT_MS = 80_000;
 export const DEFAULT_FETCH_CONNECT_TIMEOUT_MS = 30_000;
 export const DEFAULT_FETCH_KEEPALIVE_TIMEOUT_MS = 4_000;

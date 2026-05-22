@@ -23,7 +23,10 @@ function getMetadataPath(configPath: string) {
   return path.join(path.dirname(configPath), ".first-setup.json");
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // cli-tools routes touch host config files — guard every handler with the shared auth.
+  const authError = await requireCliToolsAuth(request);
+  if (authError) return authError;
   try {
     const roles = await getCurrentHermesAgentRoles();
 

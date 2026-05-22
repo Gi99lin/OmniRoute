@@ -917,7 +917,13 @@
     "settingsAuthzSubtitle": "Route inventory and bypass policy",
     "docsSubtitle": "Documentation",
     "issuesSubtitle": "Report a bug",
-    "changelogSubtitle": "Release notes"
+    "changelogSubtitle": "Release notes",
+    "leaderboard": "Leaderboard",
+    "leaderboardSubtitle": "Top contributors and usage rankings",
+    "profile": "Profile",
+    "profileSubtitle": "Your account profile",
+    "tokens": "Tokens",
+    "tokensSubtitle": "Token balance and history"
   },
   "webhooks": {
     "title": "Webhooks",
